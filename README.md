@@ -1,6 +1,6 @@
-# medication_tracker
+# Pill Mate
 
-Offline medication and supplement tracker with local notifications, home widget, calendar and reports
+Pill Mate — Offline medication and supplement tracker with local notifications, home widget, calendar and reports
 
 ## Getting Started
 

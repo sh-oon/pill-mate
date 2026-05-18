@@ -1,19 +1,19 @@
 ---
 template: plan
 version: 1.2
-feature: medication-tracker
+feature: pill-mate
 date: 2026-05-18
 author: gamja
-project: medication-tracker
+project: pill-mate
 platform: Flutter (iOS + Android)
 status: Draft
 ---
 
-# medication-tracker Planning Document
+# pill-mate Planning Document
 
 > **Summary**: 영양제·약 복용 일정을 등록하면 로컬 푸시 알람·홈 위젯·캘린더로 알려주고, 연속 복용·빈도·최근 추이 리포트를 제공하는 **오프라인 전용** Flutter 크로스플랫폼 앱.
 >
-> **Project**: medication-tracker
+> **Project**: pill-mate
 > **Version**: 0.1.0
 > **Platform**: Flutter 3.27+ / Dart 3.5+ (iOS + Android)
 > **Author**: gamja
@@ -49,7 +49,7 @@ status: Draft
 
 ### 1.3 Related Documents
 
-- Design: `docs/02-design/features/medication-tracker.design.md` (예정)
+- Design: `docs/02-design/features/pill-mate.design.md` (예정)
 - 참고: Flutter 공식 문서, drift.simonbinder.eu, flutter_local_notifications README
 
 ---
@@ -195,7 +195,7 @@ status: Draft
 ```
 Selected Level: Dynamic (Feature-based)
 
-medication-tracker/
+pill-mate/
 ├── lib/
 │   ├── main.dart
 │   ├── app.dart                          # MaterialApp + go_router
@@ -244,9 +244,9 @@ medication-tracker/
 
 - [x] 글로벌 `CLAUDE.md`: pnpm/yarn 자동 감지 — Flutter 프로젝트에 해당 안 됨 (pub 사용)
 - [x] 글로벌 규칙: 선언적 프로그래밍, 디자인시스템 atomic 컴포넌트 — Flutter Widget에 적용
-- [ ] `medication-tracker/analysis_options.yaml` (린트)
-- [ ] `medication-tracker/CONVENTIONS.md`
-- [ ] `medication-tracker/.editorconfig`
+- [ ] `pill-mate/analysis_options.yaml` (린트)
+- [ ] `pill-mate/CONVENTIONS.md`
+- [ ] `pill-mate/.editorconfig`
 
 ### 7.2 Conventions to Define/Verify
 
@@ -292,16 +292,16 @@ medication-tracker/
 
 ## 8. Next Steps
 
-1. [ ] **Design 문서 작성**: `/pdca design medication-tracker`
+1. [ ] **Design 문서 작성**: `/pdca design pill-mate`
    - Drift 스키마 상세 (테이블, 인덱스, 관계)
    - 화면 구성 및 네비게이션 흐름 (go_router)
    - 알람 롤링 스케줄링 알고리즘
    - 위젯 데이터 동기화 시퀀스 다이어그램
    - 리포트 계산 SQL 쿼리
-2. [ ] **프로젝트 초기화**: `flutter create medication-tracker --org com.gamja.medtracker --platforms=ios,android`
+2. [ ] **프로젝트 초기화**: `flutter create pill-mate --org com.gamja --platforms=ios,android`
 3. [ ] **`pubspec.yaml` 의존성 추가**: 위 6.2 패키지
-4. [ ] **컨벤션 문서**: `medication-tracker/CONVENTIONS.md`
-5. [ ] **구현 시작**: `/pdca do medication-tracker`
+4. [ ] **컨벤션 문서**: `pill-mate/CONVENTIONS.md`
+5. [ ] **구현 시작**: `/pdca do pill-mate`
 
 ---
 

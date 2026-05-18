@@ -1,4 +1,4 @@
-package com.gamja.medtracker.medication_tracker
+package com.gamja.pill_mate
 
 import io.flutter.embedding.android.FlutterActivity
 
