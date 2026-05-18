@@ -1,8 +1,10 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/database/tables/intake_logs.dart';
 import '../../../core/permissions/permission_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -18,6 +20,8 @@ import '../../../core/widgets/stat_grid_4.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/timeline_row.dart';
 import '../../../core/widgets/touchable_badge.dart';
+import '../../medication/data/intake_providers.dart';
+import '../../medication/data/intake_repository.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -30,39 +34,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   PermissionStatus? _notif;
   bool _dismissed = false;
-
-  // --- 더미 데이터 (시안 재현용) ---
-  static const int _doneCount = 2;
-  static const int _scheduledCount = 2;
-  static const int _missedCount = 1;
-  static const int _totalCount = 5;
-  static const _nextDose = (time: '12:00', name: '오메가3');
-  static const _missed = (
-    name: '비타민D',
-    scheduledLabel: '어제 21:00에 복용 예정이었어요',
-  );
-  static const _schedule = [
-    _TimelineSlot(
-      time: '08:00',
-      items: [
-        _DoseItem(name: '종합비타민', quantity: '1정', status: DoseStatus.done),
-        _DoseItem(name: '유산균', quantity: '1캡슐', status: DoseStatus.done),
-      ],
-    ),
-    _TimelineSlot(
-      time: '12:00',
-      isNext: true,
-      items: [
-        _DoseItem(name: '오메가3', quantity: '1캡슐', status: DoseStatus.scheduled),
-      ],
-    ),
-    _TimelineSlot(
-      time: '21:00',
-      items: [
-        _DoseItem(name: '마그네슘', quantity: '1정', status: DoseStatus.scheduled),
-      ],
-    ),
-  ];
 
   @override
   void initState() {
@@ -95,7 +66,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final progress = _totalCount == 0 ? 0.0 : _doneCount / _totalCount;
+    final dosesAsync = ref.watch(todayDosesProvider);
+    final countsAsync = ref.watch(todayCountsProvider);
+    final nextDoseAsync = ref.watch(todayNextDoseProvider);
+    final missedAsync = ref.watch(recentMissedProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -105,15 +79,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           padding: const EdgeInsets.only(bottom: 140),
           children: [
             AppTopBar(
-              hasUnread: true,
-              onBellTap: () => BundleNotificationSheet.show(
-                context,
-                time: '21:00',
-                meds: const [
-                  BundleMed(name: '마그네슘', quantity: '1정'),
-                  BundleMed(name: '알레르기 약', quantity: '1정'),
-                ],
-              ),
+              hasUnread: countsAsync.value?.missed != null &&
+                  (countsAsync.value!.missed > 0 ||
+                      countsAsync.value!.pending > 0),
+              onBellTap: () => _openBundleSheet(context, dosesAsync.value),
             ),
             if (_shouldShowBanner)
               Padding(
@@ -134,24 +103,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
             _SummaryCard(
-              progress: progress,
-              done: _doneCount,
-              scheduled: _scheduledCount,
-              missed: _missedCount,
-              total: _totalCount,
-              nextDoseTime: _nextDose.time,
-              nextDoseName: _nextDose.name,
+              countsAsync: countsAsync,
+              nextDoseAsync: nextDoseAsync,
             ),
-            _MissedDoseCard(
-              name: _missed.name,
-              scheduledLabel: _missed.scheduledLabel,
-              onEditRecord: () => EditRecordSheet.show(
-                context,
-                medName: _missed.name,
-                category: 'sup',
-                time: '21:00',
-                yesterday: true,
-              ),
+            missedAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
+              data: (missed) {
+                if (missed == null) return const SizedBox.shrink();
+                return _MissedDoseCard(
+                  dose: missed,
+                  onEditRecord: () => _openEditSheet(context, missed),
+                );
+              },
             ),
             SectionHeader(
               title: '오늘의 복용 일정',
@@ -161,11 +125,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 onTap: () {},
               ),
             ),
-            for (final slot in _schedule)
-              TimelineRow(
-                time: slot.time,
-                child: _MedCard(slot: slot, onTaken: () {}),
-              ),
+            _ScheduleSection(dosesAsync: dosesAsync),
           ],
         ),
       ),
@@ -173,6 +133,65 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         onPressed: () => context.push(AppRoute.drawerNew),
       ),
     );
+  }
+
+  Future<void> _openBundleSheet(
+      BuildContext context, List<DoseInstance>? doses) async {
+    // 가장 가까운 미래 시간대 묶음 또는 가장 오래된 missed 묶음
+    final now = DateTime.now();
+    DateTime? targetTime;
+    final pending = doses
+            ?.where((d) =>
+                d.status == IntakeStatus.pending && d.scheduledAt.isAfter(now))
+            .toList() ??
+        [];
+    final missed =
+        doses?.where((d) => d.status == IntakeStatus.missed).toList() ?? [];
+    if (pending.isNotEmpty) {
+      pending.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+      targetTime = pending.first.scheduledAt;
+    } else if (missed.isNotEmpty) {
+      missed.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+      targetTime = missed.first.scheduledAt;
+    }
+
+    if (targetTime == null || doses == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('알림으로 묶을 복용 예정이 없어요')),
+      );
+      return;
+    }
+
+    final bundle = doses
+        .where((d) => d.scheduledAt == targetTime)
+        .map((d) => BundleMed(name: d.medicationName, quantity: d.quantityLabel))
+        .toList();
+
+    await BundleNotificationSheet.show(
+      context,
+      time: bundle.isEmpty
+          ? ''
+          : '${targetTime.hour.toString().padLeft(2, '0')}:${targetTime.minute.toString().padLeft(2, '0')}',
+      meds: bundle,
+    );
+  }
+
+  Future<void> _openEditSheet(
+      BuildContext context, DoseInstance dose) async {
+    final choice = await EditRecordSheet.show(
+      context,
+      medName: dose.medicationName,
+      category: dose.category ?? 'sup',
+      time: dose.timeOfDay,
+      yesterday: false,
+    );
+    if (choice == EditRecordChoice.markTaken) {
+      await ref.read(intakeRepositoryProvider).markTaken(
+            medicationId: dose.medicationId,
+            scheduleId: dose.scheduleId,
+            scheduledAt: dose.scheduledAt,
+          );
+    }
   }
 }
 
@@ -182,25 +201,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
-    required this.progress,
-    required this.done,
-    required this.scheduled,
-    required this.missed,
-    required this.total,
-    required this.nextDoseTime,
-    required this.nextDoseName,
+    required this.countsAsync,
+    required this.nextDoseAsync,
   });
 
-  final double progress;
-  final int done;
-  final int scheduled;
-  final int missed;
-  final int total;
-  final String nextDoseTime;
-  final String nextDoseName;
+  final AsyncValue<TodayCounts> countsAsync;
+  final AsyncValue<DoseInstance?> nextDoseAsync;
 
   @override
   Widget build(BuildContext context) {
+    final counts = countsAsync.value ??
+        const TodayCounts(done: 0, pending: 0, missed: 0, total: 0);
+    final next = nextDoseAsync.value;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 18),
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
@@ -234,12 +247,10 @@ class _SummaryCard extends StatelessWidget {
                           height: 1.4,
                         ),
                         children: [
-                          TextSpan(text: '오늘 $total개 중\n'),
+                          TextSpan(text: '오늘 ${counts.total}개 중\n'),
                           TextSpan(
-                            text: '$done개 완료',
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                            ),
+                            text: '${counts.done}개 완료',
+                            style: const TextStyle(color: AppColors.primary),
                           ),
                           const TextSpan(text: '했어요!'),
                         ],
@@ -249,7 +260,7 @@ class _SummaryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              DonutProgress(progress: progress),
+              DonutProgress(progress: counts.progress),
             ],
           ),
           const SizedBox(height: 18),
@@ -259,31 +270,31 @@ class _SummaryCard extends StatelessWidget {
                 icon: Icons.check_rounded,
                 iconColor: AppColors.primary,
                 label: '완료',
-                count: done,
+                count: counts.done,
                 filled: true,
               ),
               StatCell(
                 icon: Icons.access_time_rounded,
                 iconColor: AppColors.primary,
                 label: '예정',
-                count: scheduled,
+                count: counts.pending,
               ),
               StatCell(
                 icon: Icons.error_outline_rounded,
                 iconColor: AppColors.missed,
                 label: '놓침',
-                count: missed,
+                count: counts.missed,
               ),
               StatCell(
                 icon: Icons.format_list_bulleted_rounded,
                 iconColor: AppColors.textMuted,
                 label: '전체',
-                count: total,
+                count: counts.total,
               ),
             ],
           ),
           const SizedBox(height: 14),
-          _NextDosePill(time: nextDoseTime, name: nextDoseName),
+          if (next != null) _NextDosePill(dose: next),
         ],
       ),
     );
@@ -291,10 +302,8 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _NextDosePill extends StatelessWidget {
-  const _NextDosePill({required this.time, required this.name});
-
-  final String time;
-  final String name;
+  const _NextDosePill({required this.dose});
+  final DoseInstance dose;
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +340,7 @@ class _NextDosePill extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            time,
+            dose.timeOfDay,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -342,7 +351,7 @@ class _NextDosePill extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              name,
+              dose.medicationName,
               style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.textStrong,
@@ -362,14 +371,9 @@ class _NextDosePill extends StatelessWidget {
 // ============================================================
 
 class _MissedDoseCard extends StatelessWidget {
-  const _MissedDoseCard({
-    required this.name,
-    required this.scheduledLabel,
-    required this.onEditRecord,
-  });
+  const _MissedDoseCard({required this.dose, required this.onEditRecord});
 
-  final String name;
-  final String scheduledLabel;
+  final DoseInstance dose;
   final VoidCallback onEditRecord;
 
   @override
@@ -396,7 +400,7 @@ class _MissedDoseCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              PillIcon.svg(medName: name),
+              PillIcon.svg(medName: dose.medicationName),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -406,7 +410,7 @@ class _MissedDoseCard extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            name,
+                            dose.medicationName,
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -415,12 +419,12 @@ class _MissedDoseCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const CategoryChip(label: '영양제'),
+                        CategoryChip.fromCode(dose.category ?? 'sup'),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      scheduledLabel,
+                      '${dose.timeOfDay}에 복용 예정이었어요',
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textMuted,
@@ -451,18 +455,83 @@ class _MissedDoseCard extends StatelessWidget {
 }
 
 // ============================================================
-// Schedule timeline rows
+// Schedule section
 // ============================================================
 
-class _MedCard extends StatelessWidget {
-  const _MedCard({required this.slot, required this.onTaken});
+class _ScheduleSection extends ConsumerWidget {
+  const _ScheduleSection({required this.dosesAsync});
 
-  final _TimelineSlot slot;
-  final VoidCallback onTaken;
+  final AsyncValue<List<DoseInstance>> dosesAsync;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return dosesAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.all(22),
+        child: Text('일정을 불러오지 못했어요: $e',
+            style: const TextStyle(color: AppColors.missed)),
+      ),
+      data: (doses) {
+        if (doses.isEmpty) return const _EmptyToday();
+        // 시간 단위로 그룹.
+        final grouped = groupBy<DoseInstance, String>(doses, (d) => d.timeOfDay);
+        final entries = grouped.entries.toList()
+          ..sort((a, b) => a.key.compareTo(b.key));
+
+        // 강조 슬롯 결정: 첫 번째 pending+미래 슬롯.
+        final now = DateTime.now();
+        String? highlightTime;
+        for (final e in entries) {
+          final hasPendingFuture = e.value.any((d) =>
+              d.status == IntakeStatus.pending &&
+              d.scheduledAt.isAfter(now));
+          if (hasPendingFuture) {
+            highlightTime = e.key;
+            break;
+          }
+        }
+
+        return Column(
+          children: [
+            for (final e in entries)
+              TimelineRow(
+                time: e.key,
+                child: _MedCard(
+                  items: e.value,
+                  highlight: e.key == highlightTime,
+                  onTaken: (dose) async {
+                    await ref.read(intakeRepositoryProvider).markTaken(
+                          medicationId: dose.medicationId,
+                          scheduleId: dose.scheduleId,
+                          scheduledAt: dose.scheduledAt,
+                        );
+                  },
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _MedCard extends StatelessWidget {
+  const _MedCard({
+    required this.items,
+    required this.highlight,
+    required this.onTaken,
+  });
+
+  final List<DoseInstance> items;
+  final bool highlight;
+  final ValueChanged<DoseInstance> onTaken;
 
   @override
   Widget build(BuildContext context) {
-    final highlight = slot.isNext;
     return Container(
       padding: EdgeInsets.all(highlight ? 13 : 14),
       decoration: BoxDecoration(
@@ -475,16 +544,16 @@ class _MedCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (var i = 0; i < slot.items.length; i++) ...[
+          for (var i = 0; i < items.length; i++) ...[
             if (i > 0) ...[
               const SizedBox(height: 12),
               const Divider(height: 1, color: AppColors.border),
               const SizedBox(height: 12),
             ],
             _DoseRow(
-              item: slot.items[i],
-              showTakeButton: slot.isNext,
-              onTaken: onTaken,
+              dose: items[i],
+              showTakeButton: highlight && items[i].status == IntakeStatus.pending,
+              onTaken: () => onTaken(items[i]),
             ),
           ],
         ],
@@ -495,14 +564,12 @@ class _MedCard extends StatelessWidget {
 
 class _DoseRow extends StatelessWidget {
   const _DoseRow({
-    required this.item,
+    required this.dose,
     required this.showTakeButton,
     required this.onTaken,
   });
 
-  final _DoseItem item;
-
-  /// 강조 슬롯에 속하면 상태 배지 대신 "먹었어요" 버튼 노출.
+  final DoseInstance dose;
   final bool showTakeButton;
   final VoidCallback onTaken;
 
@@ -510,7 +577,7 @@ class _DoseRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        PillIcon.svg(medName: item.name),
+        PillIcon.svg(medName: dose.medicationName),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -520,7 +587,7 @@ class _DoseRow extends StatelessWidget {
                 children: [
                   Flexible(
                     child: Text(
-                      item.name,
+                      dose.medicationName,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -529,12 +596,12 @@ class _DoseRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const CategoryChip(label: '영양제'),
+                  CategoryChip.fromCode(dose.category ?? 'sup'),
                 ],
               ),
               const SizedBox(height: 3),
               Text(
-                item.quantity,
+                dose.quantityLabel,
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textMuted,
@@ -550,14 +617,48 @@ class _DoseRow extends StatelessWidget {
                 onPressed: onTaken,
                 size: AppButtonSize.sm,
               )
-            : StatusBadge(status: item.status),
+            : StatusBadge(status: _toBadgeStatus(dose.status)),
       ],
     );
   }
 }
 
+DoseStatus _toBadgeStatus(IntakeStatus s) => switch (s) {
+      IntakeStatus.taken => DoseStatus.done,
+      IntakeStatus.pending => DoseStatus.scheduled,
+      IntakeStatus.missed => DoseStatus.missed,
+      IntakeStatus.skipped => DoseStatus.done,
+    };
+
+class _EmptyToday extends StatelessWidget {
+  const _EmptyToday();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 0),
+      child: Column(
+        children: const [
+          Icon(Icons.event_available_outlined,
+              size: 56, color: AppColors.textFaint),
+          SizedBox(height: 12),
+          Text(
+            '오늘 예정된 복용이 없어요',
+            style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+          ),
+          SizedBox(height: 4),
+          Text(
+            '+ 버튼으로 약을 등록해보세요',
+            style: TextStyle(fontSize: 13, color: AppColors.textFaint),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ============================================================
-// Permission banner (denied notifications)
+// Permission banner
 // ============================================================
 
 class _PermissionBanner extends StatelessWidget {
@@ -629,32 +730,4 @@ class _PermissionBanner extends StatelessWidget {
       ),
     );
   }
-}
-
-// ============================================================
-// Data classes
-// ============================================================
-
-class _DoseItem {
-  const _DoseItem({
-    required this.name,
-    required this.quantity,
-    required this.status,
-  });
-
-  final String name;
-  final String quantity;
-  final DoseStatus status;
-}
-
-class _TimelineSlot {
-  const _TimelineSlot({
-    required this.time,
-    required this.items,
-    this.isNext = false,
-  });
-
-  final String time;
-  final List<_DoseItem> items;
-  final bool isNext;
 }
