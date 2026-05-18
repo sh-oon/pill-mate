@@ -7,11 +7,22 @@ class AppColors {
   // Brand
   static const Color primary = Color(0xFF4661F2);
   static const Color primaryTint = Color(0xFFE8ECFB);
+  static const Color primarySurface = Color(0xFFF6F8FF); // 강조 카드(다음 복용) bg
+  static const Color lavenderRing = Color(0xFFD8DEF8); // 도넛 배경 링
 
   // Surface
   static const Color background = Color(0xFFF7F8FA);
   static const Color surface = Colors.white;
   static const Color surfaceMuted = Color(0xFFECEEF2);
+  static const Color missedSoft = Color(0xFFFFF7F7); // 놓친 복용 배너 soft bg
+
+  // Pill swatches (홈 일정 카드 더미 데이터)
+  static const Color pillPink = Color(0xFFFF85A1);
+  static const Color pillYellow = Color(0xFFFFD568);
+  static const Color pillBlue = Color(0xFF4D88FF);
+  static const Color pillBlueLight = Color(0xFF92B6FF);
+  static const Color pillOrange = Color(0xFFFFB52E);
+  static const Color pillPurple = Color(0xFFB19DFB);
 
   // Text
   static const Color textStrong = Color(0xFF1A1B2E);

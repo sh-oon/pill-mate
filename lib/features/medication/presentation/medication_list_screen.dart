@@ -10,7 +10,7 @@ class MedicationListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text('약 / 영양제')),
+      appBar: AppBar(title: const Text('약 서랍')),
       body: const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
@@ -21,7 +21,7 @@ class MedicationListScreen extends ConsumerWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push(AppRoute.medicationNew),
+        onPressed: () => context.push(AppRoute.drawerNew),
         icon: const Icon(Icons.add),
         label: const Text('추가'),
       ),
