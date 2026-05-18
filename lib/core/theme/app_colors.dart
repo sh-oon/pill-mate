@@ -44,4 +44,9 @@ class AppColors {
 
   // Accent (cheeks etc.)
   static const Color accentPink = Color(0xFFFF85A1);
+  static const Color accentPurple = Color(0xFF9B7CFF); // 리포트 메트릭(시간대)
+  static const Color accentPurpleTint = Color(0xFFF0EBFE);
+
+  // Calendar
+  static const Color calendarCompleted = Color(0xFF2DCB7B); // success보다 밝은 녹색
 }
