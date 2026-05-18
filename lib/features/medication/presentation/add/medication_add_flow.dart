@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/database/tables/schedules.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_buttons.dart';
+import '../../data/medication_providers.dart';
+import '../../data/medication_repository.dart';
 import 'steps/step1_category.dart';
 import 'steps/step2_name.dart';
 import 'steps/step3_schedule.dart';
@@ -28,6 +31,35 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
   String _name = '';
   String _repeat = 'daily';
   final List<String> _times = ['08:00'];
+  bool _saving = false;
+
+  bool get _isEdit => widget.medicationId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEdit) _prefillFromExisting();
+  }
+
+  Future<void> _prefillFromExisting() async {
+    final m = await ref
+        .read(medicationRepositoryProvider)
+        .getById(widget.medicationId!);
+    if (m == null || !mounted) return;
+    setState(() {
+      _category = m.medication.category ?? 'sup';
+      _name = m.medication.name;
+      _times
+        ..clear()
+        ..addAll(m.times);
+      if (_times.isEmpty) _times.add('08:00');
+      _repeat = switch (m.repeatKind) {
+        RepeatKind.daily => 'daily',
+        RepeatKind.weekly => 'weekly',
+        RepeatKind.interval => 'interval',
+      };
+    });
+  }
 
   void _back() {
     if (_step > 1) {
@@ -45,12 +77,38 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
     }
   }
 
-  void _finish() {
-    // TODO: persist via data layer
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('등록되었어요')),
+  Future<void> _finish() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    final repo = ref.read(medicationRepositoryProvider);
+    final draft = MedicationDraft(
+      name: _name.trim(),
+      category: _category!,
+      times: _times,
+      repeatKind: switch (_repeat) {
+        'weekly' => RepeatKind.weekly,
+        'interval' => RepeatKind.interval,
+        _ => RepeatKind.daily,
+      },
     );
-    context.pop();
+    try {
+      if (_isEdit) {
+        await repo.updateWithSchedules(widget.medicationId!, draft);
+      } else {
+        await repo.insertWithSchedules(draft);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_isEdit ? '수정되었어요' : '등록되었어요')),
+      );
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('저장 실패: $e')),
+      );
+    }
   }
 
   bool get _canProceed => switch (_step) {
@@ -60,7 +118,7 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
         _ => false,
       };
 
-  String get _nextLabel => _step == 3 ? '등록 완료' : '다음';
+  String get _nextLabel => _step == 3 ? (_isEdit ? '수정 완료' : '등록 완료') : '다음';
 
   @override
   Widget build(BuildContext context) {
@@ -81,9 +139,10 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
               padding: const EdgeInsets.fromLTRB(22, 16, 22, 16),
               child: AppButton(
                 label: _nextLabel,
-                onPressed: _canProceed ? _next : null,
+                onPressed: _canProceed && !_saving ? _next : null,
                 size: AppButtonSize.lg,
                 fullWidth: true,
+                loading: _saving,
               ),
             ),
           ],

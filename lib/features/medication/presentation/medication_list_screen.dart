@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
@@ -11,8 +12,10 @@ import '../../../core/widgets/filter_pill.dart';
 import '../../../core/widgets/pill_icon.dart';
 import '../../../core/widgets/pill_toggle_switch.dart';
 import '../../../core/widgets/search_input_bar.dart';
+import '../data/medication_providers.dart';
+import '../data/medication_repository.dart';
 
-/// 약 서랍 (rDr) — 검색/필터 + 약 카드 리스트.
+/// 약 서랍 (rDr) — Drift 기반 실데이터 리스트.
 class MedicationListScreen extends ConsumerStatefulWidget {
   const MedicationListScreen({super.key});
 
@@ -22,72 +25,21 @@ class MedicationListScreen extends ConsumerStatefulWidget {
 }
 
 class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
-  // --- 더미 데이터 (시안 fixture와 동일) ---
-  static const _meds = <_MedFixture>[
-    _MedFixture(
-        id: 1,
-        name: '종합비타민',
-        category: 'sup',
-        quantity: '1정',
-        alarm: true,
-        nextDose: '내일 08:00'),
-    _MedFixture(
-        id: 2,
-        name: '유산균',
-        category: 'sup',
-        quantity: '1캡슐',
-        alarm: true,
-        nextDose: '오늘 08:00'),
-    _MedFixture(
-        id: 3,
-        name: '오메가3',
-        category: 'sup',
-        quantity: '1캡슐',
-        alarm: true,
-        nextDose: '오늘 12:00'),
-    _MedFixture(
-        id: 4,
-        name: '마그네슘',
-        category: 'sup',
-        quantity: '1정',
-        alarm: true,
-        nextDose: '내일 21:00'),
-    _MedFixture(
-        id: 5,
-        name: '비타민D',
-        category: 'sup',
-        quantity: '1정',
-        alarm: true,
-        nextDose: '내일 09:00'),
-    _MedFixture(
-        id: 6,
-        name: '감기약',
-        category: 'med',
-        quantity: '1정',
-        alarm: false,
-        prn: true),
-  ];
-
-  // 필터 상태 (전체/영양제/약).
   _CategoryFilter _filter = _CategoryFilter.all;
-  // 토글 로컬 오버라이드 (메모리만).
-  final Map<int, bool> _alarmOverrides = {};
 
-  List<_MedFixture> get _filteredMeds {
-    return _meds.where((m) {
-      switch (_filter) {
-        case _CategoryFilter.all:
-          return true;
-        case _CategoryFilter.sup:
-          return m.category == 'sup';
-        case _CategoryFilter.med:
-          return m.category == 'med';
-      }
-    }).toList();
+  bool _matchesFilter(MedicationWithSchedules m) {
+    final cat = m.medication.category;
+    return switch (_filter) {
+      _CategoryFilter.all => true,
+      _CategoryFilter.sup => cat == 'sup',
+      _CategoryFilter.med => cat == 'med',
+    };
   }
 
   @override
   Widget build(BuildContext context) {
+    final async = ref.watch(medicationsStreamProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -100,39 +52,62 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 140),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(22, 4, 22, 14),
-            child: SearchInputBar(hintText: '약 이름 또는 성분명 검색'),
-          ),
-          _FilterRow(
-            filter: _filter,
-            onChange: (f) => setState(() => _filter = f),
-          ),
-          for (final m in _filteredMeds)
-            _MedListCard(
-              med: m,
-              alarmOverride: _alarmOverrides[m.id],
-              onToggleAlarm: (v) =>
-                  setState(() => _alarmOverrides[m.id] = v),
-              onTap: () => context.push(AppRoute.drawerDetailPath(m.id)),
-              onDelete: () async {
-                final ok = await ConfirmActionDialog.show(
-                  context,
-                  title: '${m.name} 삭제',
-                  message: '이 약과 모든 복용 기록이\n함께 삭제됩니다. 되돌릴 수 없어요.',
-                );
-                if (!context.mounted) return;
-                if (ok) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${m.name} 삭제됨')),
-                  );
-                }
-              },
-            ),
-        ],
+      body: async.when(
+        loading: () =>
+            const Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
+        error: (e, _) => _ErrorState(error: e),
+        data: (all) {
+          final filtered = all.where(_matchesFilter).toList();
+          return ListView(
+            padding: const EdgeInsets.only(top: 8, bottom: 140),
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(22, 4, 22, 14),
+                child: SearchInputBar(hintText: '약 이름 또는 성분명 검색'),
+              ),
+              _FilterRow(
+                filter: _filter,
+                onChange: (f) => setState(() => _filter = f),
+              ),
+              if (all.isEmpty)
+                const _EmptyState()
+              else if (filtered.isEmpty)
+                const _EmptyFiltered()
+              else
+                for (final m in filtered)
+                  _SwipeToDelete(
+                    id: m.medication.id,
+                    onConfirm: () => ConfirmActionDialog.show(
+                      context,
+                      title: '${m.medication.name} 삭제',
+                      message: '이 약과 모든 복용 기록이\n함께 삭제됩니다. 되돌릴 수 없어요.',
+                    ),
+                    onDismissed: () async {
+                      await ref
+                          .read(medicationRepositoryProvider)
+                          .delete(m.medication.id);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${m.medication.name} 삭제됨'),
+                        ),
+                      );
+                    },
+                    child: _MedListCard(
+                      data: m,
+                      onToggleAlarm: (v) {
+                        ref
+                            .read(medicationRepositoryProvider)
+                            .setAlarmEnabled(m.medication.id, v);
+                      },
+                      onTap: () => context.push(
+                        AppRoute.drawerDetailPath(m.medication.id),
+                      ),
+                    ),
+                  ),
+            ],
+          );
+        },
       ),
       floatingActionButton: AppFab(
         onPressed: () => context.push(AppRoute.drawerNew),
@@ -201,8 +176,7 @@ class _SortChip extends StatelessWidget {
               '이름순',
               style: TextStyle(fontSize: 12, color: AppColors.textMuted),
             ),
-            Icon(Icons.expand_more,
-                size: 14, color: AppColors.textMuted),
+            Icon(Icons.expand_more, size: 14, color: AppColors.textMuted),
           ],
         ),
       ),
@@ -216,73 +190,96 @@ class _SortChip extends StatelessWidget {
 
 class _MedListCard extends StatelessWidget {
   const _MedListCard({
-    required this.med,
-    required this.alarmOverride,
+    required this.data,
     required this.onToggleAlarm,
     required this.onTap,
-    required this.onDelete,
   });
 
-  final _MedFixture med;
-  final bool? alarmOverride;
+  final MedicationWithSchedules data;
   final ValueChanged<bool> onToggleAlarm;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
 
-  bool get _alarmOn => alarmOverride ?? med.alarm;
+  bool get _alarmOn => data.schedules.any((s) => s.enabled);
+
+  /// PRN(필요시 복용) = 스케줄 없음.
+  bool get _isPrn => data.schedules.isEmpty;
+
+  String get _quantityLabel {
+    final m = data.medication;
+    final dose = m.dosage;
+    final unit = m.unit;
+    if (dose != null && unit != null) return '$dose$unit';
+    if (dose != null) return dose;
+    return '1정';
+  }
+
+  String? get _nextDoseLabel {
+    if (_isPrn) return null;
+    // 가장 가까운 시각을 단순 계산 (오늘/내일).
+    final now = DateTime.now();
+    final mins = now.hour * 60 + now.minute;
+    final sorted = [...data.times]..sort();
+    String? todayLabel;
+    for (final t in sorted) {
+      final parts = t.split(':');
+      final tm = int.parse(parts[0]) * 60 + int.parse(parts[1]);
+      if (tm > mins) {
+        todayLabel = '오늘 $t';
+        break;
+      }
+    }
+    return todayLabel ?? '내일 ${sorted.first}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Material(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          child: InkWell(
-            onTap: onTap,
+    final m = data.medication;
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(22, 0, 22, 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              _MedListCardTop(
+                name: m.name,
+                category: m.category ?? 'sup',
+                quantity: _isPrn ? '$_quantityLabel (필요시 복용)' : _quantityLabel,
+                alarmOn: _alarmOn,
+                onToggleAlarm: onToggleAlarm,
               ),
-              child: Column(
-                children: [
-                  _MedListCardTop(
-                    med: med,
-                    alarmOn: _alarmOn,
-                    onToggleAlarm: onToggleAlarm,
-                  ),
-                  const SizedBox(height: 12),
-                  if (med.prn)
-                    const _PrnFooter()
-                  else
-                    _NextDoseFooter(time: med.nextDose ?? '내일'),
-                ],
-              ),
-            ),
+              const SizedBox(height: 12),
+              if (_isPrn)
+                const _PrnFooter()
+              else
+                _NextDoseFooter(time: _nextDoseLabel!),
+            ],
           ),
         ),
-        Positioned(
-          top: 10,
-          right: 32,
-          child: _DeleteCornerButton(onTap: onDelete),
-        ),
-      ],
+      ),
     );
   }
 }
 
 class _MedListCardTop extends StatelessWidget {
   const _MedListCardTop({
-    required this.med,
+    required this.name,
+    required this.category,
+    required this.quantity,
     required this.alarmOn,
     required this.onToggleAlarm,
   });
 
-  final _MedFixture med;
+  final String name;
+  final String category;
+  final String quantity;
   final bool alarmOn;
   final ValueChanged<bool> onToggleAlarm;
 
@@ -290,7 +287,6 @@ class _MedListCardTop extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // 56x56 큰 약 아이콘 (`.dp`).
         Container(
           width: 56,
           height: 56,
@@ -299,41 +295,38 @@ class _MedListCardTop extends StatelessWidget {
             color: AppColors.background,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: PillIcon.svg(medName: med.name, size: 44),
+          child: PillIcon.svg(medName: name, size: 44),
         ),
         const SizedBox(width: 14),
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(right: 32), // 우측 삭제버튼 여백
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        med.name,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textStrong,
-                        ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textStrong,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    CategoryChip.fromCode(med.category),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  med.prn ? '${med.quantity} (필요시 복용)' : med.quantity,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textMuted,
                   ),
+                  const SizedBox(width: 6),
+                  CategoryChip.fromCode(category),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                quantity,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textMuted,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         PillToggleSwitch(value: alarmOn, onChanged: onToggleAlarm),
@@ -424,22 +417,78 @@ class _PrnFooter extends StatelessWidget {
   }
 }
 
-class _DeleteCornerButton extends StatelessWidget {
-  const _DeleteCornerButton({required this.onTap});
-  final VoidCallback onTap;
+// ============================================================
+// 스와이프-투-딜리트 래퍼
+// ============================================================
+
+class _SwipeToDelete extends StatefulWidget {
+  const _SwipeToDelete({
+    required this.id,
+    required this.child,
+    required this.onConfirm,
+    required this.onDismissed,
+  });
+
+  final int id;
+  final Widget child;
+  final Future<bool> Function() onConfirm;
+  final VoidCallback onDismissed;
+
+  @override
+  State<_SwipeToDelete> createState() => _SwipeToDeleteState();
+}
+
+class _SwipeToDeleteState extends State<_SwipeToDelete>
+    with SingleTickerProviderStateMixin {
+  late final SlidableController _slc = SlidableController(this);
+
+  @override
+  void dispose() {
+    _slc.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleDelete() async {
+    final ok = await widget.onConfirm();
+    if (ok) {
+      widget.onDismissed();
+    } else {
+      await _slc.close();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.background,
-      shape: const CircleBorder(),
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: const SizedBox(
-          width: 28,
-          height: 28,
-          child: Icon(Icons.close, size: 16, color: AppColors.textMuted),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 0, 22, 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Slidable(
+          key: ValueKey('med-${widget.id}'),
+          controller: _slc,
+          groupTag: 'med-list',
+          endActionPane: ActionPane(
+            motion: const BehindMotion(),
+            extentRatio: 0.24,
+            dismissible: DismissiblePane(
+              confirmDismiss: () async {
+                final ok = await widget.onConfirm();
+                if (!ok) await _slc.close();
+                return ok;
+              },
+              onDismissed: widget.onDismissed,
+            ),
+            children: [
+              SlidableAction(
+                onPressed: (_) => _handleDelete(),
+                backgroundColor: AppColors.missed,
+                foregroundColor: Colors.white,
+                icon: Icons.delete_outline,
+                label: '삭제',
+              ),
+            ],
+          ),
+          child: widget.child,
         ),
       ),
     );
@@ -447,25 +496,66 @@ class _DeleteCornerButton extends StatelessWidget {
 }
 
 // ============================================================
-// 데이터 (fixture)
+// Empty / Error states
 // ============================================================
 
-class _MedFixture {
-  const _MedFixture({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.quantity,
-    required this.alarm,
-    this.prn = false,
-    this.nextDose,
-  });
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
 
-  final int id;
-  final String name;
-  final String category; // 'sup' | 'med'
-  final String quantity;
-  final bool alarm;
-  final bool prn;
-  final String? nextDose;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 60, 22, 0),
+      child: Column(
+        children: const [
+          Icon(Icons.medication_outlined, size: 56, color: AppColors.textFaint),
+          SizedBox(height: 12),
+          Text(
+            '등록된 약/영양제가 없습니다',
+            style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+          ),
+          SizedBox(height: 4),
+          Text(
+            '오른쪽 아래 + 버튼으로 추가하세요',
+            style: TextStyle(fontSize: 13, color: AppColors.textFaint),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyFiltered extends StatelessWidget {
+  const _EmptyFiltered();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(22, 48, 22, 0),
+      child: Center(
+        child: Text(
+          '필터 조건과 일치하는 항목이 없어요',
+          style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.error});
+  final Object error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(22),
+      child: Center(
+        child: Text(
+          '불러오기 실패: $error',
+          style: const TextStyle(fontSize: 13, color: AppColors.missed),
+        ),
+      ),
+    );
+  }
 }

@@ -35,6 +35,18 @@ class $MedicationsTable extends Medications
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    true,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 8),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _dosageMeta = const VerificationMeta('dosage');
   @override
   late final GeneratedColumn<String> dosage = GeneratedColumn<String>(
@@ -144,6 +156,7 @@ class $MedicationsTable extends Medications
   List<GeneratedColumn> get $columns => [
     id,
     name,
+    category,
     dosage,
     unit,
     shape,
@@ -176,6 +189,12 @@ class $MedicationsTable extends Medications
       );
     } else if (isInserting) {
       context.missing(_nameMeta);
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
     }
     if (data.containsKey('dosage')) {
       context.handle(
@@ -248,6 +267,10 @@ class $MedicationsTable extends Medications
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      ),
       dosage: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}dosage'],
@@ -296,6 +319,9 @@ class $MedicationsTable extends Medications
 class Medication extends DataClass implements Insertable<Medication> {
   final int id;
   final String name;
+
+  /// 'med' (약) | 'sup' (영양제). 카테고리.
+  final String? category;
   final String? dosage;
   final String? unit;
   final String? shape;
@@ -308,6 +334,7 @@ class Medication extends DataClass implements Insertable<Medication> {
   const Medication({
     required this.id,
     required this.name,
+    this.category,
     this.dosage,
     this.unit,
     this.shape,
@@ -323,6 +350,9 @@ class Medication extends DataClass implements Insertable<Medication> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['name'] = Variable<String>(name);
+    if (!nullToAbsent || category != null) {
+      map['category'] = Variable<String>(category);
+    }
     if (!nullToAbsent || dosage != null) {
       map['dosage'] = Variable<String>(dosage);
     }
@@ -351,6 +381,9 @@ class Medication extends DataClass implements Insertable<Medication> {
     return MedicationsCompanion(
       id: Value(id),
       name: Value(name),
+      category: category == null && nullToAbsent
+          ? const Value.absent()
+          : Value(category),
       dosage: dosage == null && nullToAbsent
           ? const Value.absent()
           : Value(dosage),
@@ -379,6 +412,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     return Medication(
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
+      category: serializer.fromJson<String?>(json['category']),
       dosage: serializer.fromJson<String?>(json['dosage']),
       unit: serializer.fromJson<String?>(json['unit']),
       shape: serializer.fromJson<String?>(json['shape']),
@@ -396,6 +430,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'name': serializer.toJson<String>(name),
+      'category': serializer.toJson<String?>(category),
       'dosage': serializer.toJson<String?>(dosage),
       'unit': serializer.toJson<String?>(unit),
       'shape': serializer.toJson<String?>(shape),
@@ -411,6 +446,7 @@ class Medication extends DataClass implements Insertable<Medication> {
   Medication copyWith({
     int? id,
     String? name,
+    Value<String?> category = const Value.absent(),
     Value<String?> dosage = const Value.absent(),
     Value<String?> unit = const Value.absent(),
     Value<String?> shape = const Value.absent(),
@@ -423,6 +459,7 @@ class Medication extends DataClass implements Insertable<Medication> {
   }) => Medication(
     id: id ?? this.id,
     name: name ?? this.name,
+    category: category.present ? category.value : this.category,
     dosage: dosage.present ? dosage.value : this.dosage,
     unit: unit.present ? unit.value : this.unit,
     shape: shape.present ? shape.value : this.shape,
@@ -437,6 +474,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     return Medication(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
+      category: data.category.present ? data.category.value : this.category,
       dosage: data.dosage.present ? data.dosage.value : this.dosage,
       unit: data.unit.present ? data.unit.value : this.unit,
       shape: data.shape.present ? data.shape.value : this.shape,
@@ -454,6 +492,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     return (StringBuffer('Medication(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('category: $category, ')
           ..write('dosage: $dosage, ')
           ..write('unit: $unit, ')
           ..write('shape: $shape, ')
@@ -471,6 +510,7 @@ class Medication extends DataClass implements Insertable<Medication> {
   int get hashCode => Object.hash(
     id,
     name,
+    category,
     dosage,
     unit,
     shape,
@@ -487,6 +527,7 @@ class Medication extends DataClass implements Insertable<Medication> {
       (other is Medication &&
           other.id == this.id &&
           other.name == this.name &&
+          other.category == this.category &&
           other.dosage == this.dosage &&
           other.unit == this.unit &&
           other.shape == this.shape &&
@@ -501,6 +542,7 @@ class Medication extends DataClass implements Insertable<Medication> {
 class MedicationsCompanion extends UpdateCompanion<Medication> {
   final Value<int> id;
   final Value<String> name;
+  final Value<String?> category;
   final Value<String?> dosage;
   final Value<String?> unit;
   final Value<String?> shape;
@@ -513,6 +555,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   const MedicationsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
+    this.category = const Value.absent(),
     this.dosage = const Value.absent(),
     this.unit = const Value.absent(),
     this.shape = const Value.absent(),
@@ -526,6 +569,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   MedicationsCompanion.insert({
     this.id = const Value.absent(),
     required String name,
+    this.category = const Value.absent(),
     this.dosage = const Value.absent(),
     this.unit = const Value.absent(),
     this.shape = const Value.absent(),
@@ -539,6 +583,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   static Insertable<Medication> custom({
     Expression<int>? id,
     Expression<String>? name,
+    Expression<String>? category,
     Expression<String>? dosage,
     Expression<String>? unit,
     Expression<String>? shape,
@@ -552,6 +597,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
+      if (category != null) 'category': category,
       if (dosage != null) 'dosage': dosage,
       if (unit != null) 'unit': unit,
       if (shape != null) 'shape': shape,
@@ -567,6 +613,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   MedicationsCompanion copyWith({
     Value<int>? id,
     Value<String>? name,
+    Value<String?>? category,
     Value<String?>? dosage,
     Value<String?>? unit,
     Value<String?>? shape,
@@ -580,6 +627,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     return MedicationsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
+      category: category ?? this.category,
       dosage: dosage ?? this.dosage,
       unit: unit ?? this.unit,
       shape: shape ?? this.shape,
@@ -600,6 +648,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
     }
     if (dosage.present) {
       map['dosage'] = Variable<String>(dosage.value);
@@ -636,6 +687,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     return (StringBuffer('MedicationsCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('category: $category, ')
           ..write('dosage: $dosage, ')
           ..write('unit: $unit, ')
           ..write('shape: $shape, ')
@@ -2182,6 +2234,7 @@ typedef $$MedicationsTableCreateCompanionBuilder =
     MedicationsCompanion Function({
       Value<int> id,
       required String name,
+      Value<String?> category,
       Value<String?> dosage,
       Value<String?> unit,
       Value<String?> shape,
@@ -2196,6 +2249,7 @@ typedef $$MedicationsTableUpdateCompanionBuilder =
     MedicationsCompanion Function({
       Value<int> id,
       Value<String> name,
+      Value<String?> category,
       Value<String?> dosage,
       Value<String?> unit,
       Value<String?> shape,
@@ -2270,6 +2324,11 @@ class $$MedicationsTableFilterComposer
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2388,6 +2447,11 @@ class $$MedicationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get dosage => $composableBuilder(
     column: $table.dosage,
     builder: (column) => ColumnOrderings(column),
@@ -2448,6 +2512,9 @@ class $$MedicationsTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
 
   GeneratedColumn<String> get dosage =>
       $composableBuilder(column: $table.dosage, builder: (column) => column);
@@ -2557,6 +2624,7 @@ class $$MedicationsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<String?> category = const Value.absent(),
                 Value<String?> dosage = const Value.absent(),
                 Value<String?> unit = const Value.absent(),
                 Value<String?> shape = const Value.absent(),
@@ -2569,6 +2637,7 @@ class $$MedicationsTableTableManager
               }) => MedicationsCompanion(
                 id: id,
                 name: name,
+                category: category,
                 dosage: dosage,
                 unit: unit,
                 shape: shape,
@@ -2583,6 +2652,7 @@ class $$MedicationsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required String name,
+                Value<String?> category = const Value.absent(),
                 Value<String?> dosage = const Value.absent(),
                 Value<String?> unit = const Value.absent(),
                 Value<String?> shape = const Value.absent(),
@@ -2595,6 +2665,7 @@ class $$MedicationsTableTableManager
               }) => MedicationsCompanion.insert(
                 id: id,
                 name: name,
+                category: category,
                 dosage: dosage,
                 unit: unit,
                 shape: shape,
