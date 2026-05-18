@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/database/tables/intake_logs.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_top_bar.dart';
 import '../../../core/widgets/category_chip.dart';
-import '../../../core/widgets/sheets/bundle_notification_sheet.dart';
 import '../../../core/widgets/filter_pill.dart';
 import '../../../core/widgets/pill_icon.dart';
+import '../../../core/widgets/sheets/bundle_notification_sheet.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/timeline_row.dart';
+import '../../medication/data/calendar_providers.dart';
+import '../../medication/data/intake_repository.dart';
 import 'widgets/calendar_legend.dart';
 import 'widgets/month_grid.dart';
 
@@ -20,79 +23,93 @@ class CalendarScreen extends ConsumerStatefulWidget {
 }
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
-  // --- 시안 fixture ---
-  static const _completedDays = {
-    1, 2, 4, 5, 7, 8, 9, 11, 12, 13, 15, 19, 20, 21, 22, 23,
-    26, 27, 28, 29, 30,
-  };
-  static const _missedDays = {6, 16};
-  static const _scheduledDays = {14};
-  static const _mutedPrevMonth = [27, 28, 29, 30]; // 4월 말 회색
-
-  int _selectedDay = 14;
+  late DateTime _selectedDate;
+  late int _viewYear;
+  late int _viewMonth;
   _DayFilter _filter = _DayFilter.all;
 
-  List<DayCellSpec> _buildCells() {
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _selectedDate = DateTime(now.year, now.month, now.day);
+    _viewYear = now.year;
+    _viewMonth = now.month;
+  }
+
+  void _shiftMonth(int delta) {
+    setState(() {
+      var y = _viewYear, m = _viewMonth + delta;
+      while (m < 1) {
+        m += 12;
+        y -= 1;
+      }
+      while (m > 12) {
+        m -= 12;
+        y += 1;
+      }
+      _viewYear = y;
+      _viewMonth = m;
+    });
+  }
+
+  List<DayCellSpec> _buildCells(Map<int, DayMarkKind> marks) {
     final cells = <DayCellSpec>[];
-    for (final d in _mutedPrevMonth) {
+    final first = DateTime(_viewYear, _viewMonth, 1);
+    // weekday of first day (Mon=1..Sun=7), 일요일 시작 칸 정렬
+    final firstDow = first.weekday % 7; // Mon=1..Sat=6, Sun=0
+    // 이전 달 회색 채우기
+    final prevMonthEnd = DateTime(_viewYear, _viewMonth, 0);
+    for (var i = firstDow; i > 0; i--) {
+      final d = prevMonthEnd.day - i + 1;
       cells.add(DayCellSpec(day: d, mark: DayMark.none, muted: true));
     }
-    for (var d = 1; d <= 31; d++) {
-      final dw = (d + 3) % 7; // 5월 1일이 목요일이라 시안과 동일하게 +3
-      final weekend = switch (dw) {
-        0 => WeekendKind.sunday,
-        6 => WeekendKind.saturday,
-        _ => WeekendKind.none,
-      };
-      final mark = _completedDays.contains(d)
-          ? DayMark.completed
-          : _scheduledDays.contains(d)
-              ? DayMark.scheduled
-              : _missedDays.contains(d)
-                  ? DayMark.missed
-                  : DayMark.none;
-      cells.add(DayCellSpec(day: d, mark: mark, weekend: weekend));
+    final daysInMonth =
+        DateTime(_viewYear, _viewMonth + 1, 0).day;
+    for (var d = 1; d <= daysInMonth; d++) {
+      final dw = DateTime(_viewYear, _viewMonth, d).weekday;
+      final weekend = dw == DateTime.sunday
+          ? WeekendKind.sunday
+          : dw == DateTime.saturday
+              ? WeekendKind.saturday
+              : WeekendKind.none;
+      cells.add(DayCellSpec(
+        day: d,
+        mark: _toCellMark(marks[d] ?? DayMarkKind.none),
+        weekend: weekend,
+      ));
     }
     return cells;
   }
 
-  /// 선택 일자의 기록 (mockup의 recBase).
-  List<_Record> _recordsForDay(int day) {
-    return switch (day) {
-      14 => const [
-          _Record(time: '08:00', name: '종합비타민', qty: '1정', status: DoseStatus.done),
-          _Record(time: '08:00', name: '유산균', qty: '1캡슐', status: DoseStatus.done),
-          _Record(time: '12:00', name: '오메가3', qty: '1캡슐', status: DoseStatus.scheduled),
-          _Record(time: '21:00', name: '마그네슘', qty: '1정', status: DoseStatus.missed),
-        ],
-      6 => const [
-          _Record(time: '08:00', name: '유산균', qty: '1캡슐', status: DoseStatus.done),
-          _Record(time: '21:00', name: '마그네슘', qty: '1정', status: DoseStatus.missed),
-        ],
-      16 => const [
-          _Record(time: '21:00', name: '비타민D', qty: '1정', status: DoseStatus.missed),
-        ],
-      _ => const [],
-    };
-  }
+  DayMark _toCellMark(DayMarkKind k) => switch (k) {
+        DayMarkKind.completed => DayMark.completed,
+        DayMarkKind.scheduled => DayMark.scheduled,
+        DayMarkKind.missed => DayMark.missed,
+        DayMarkKind.none => DayMark.none,
+      };
 
-  String _recordsTitleFor(int day) {
-    const dow = ['목', '금', '토', '일', '월', '화', '수']; // 5/1 = 목 기준
-    final w = dow[(day - 1) % 7];
-    return '5월 $day일 ($w) 복용 기록';
+  String _recordsTitleFor(DateTime date) {
+    const dow = ['월', '화', '수', '목', '금', '토', '일'];
+    final w = dow[date.weekday - 1];
+    return '${date.month}월 ${date.day}일 ($w) 복용 기록';
   }
 
   @override
   Widget build(BuildContext context) {
-    final records = _recordsForDay(_selectedDay);
+    final marksAsync = ref.watch(
+      monthMarksProvider((year: _viewYear, month: _viewMonth)),
+    );
+    final dosesAsync = ref.watch(dayDosesProvider(_selectedDate));
+    final records = dosesAsync.value ?? const <DoseInstance>[];
     final counts = {
-      DoseStatus.done: records.where((r) => r.status == DoseStatus.done).length,
-      DoseStatus.scheduled:
-          records.where((r) => r.status == DoseStatus.scheduled).length,
-      DoseStatus.missed:
-          records.where((r) => r.status == DoseStatus.missed).length,
+      IntakeStatus.taken:
+          records.where((r) => r.status == IntakeStatus.taken).length,
+      IntakeStatus.pending:
+          records.where((r) => r.status == IntakeStatus.pending).length,
+      IntakeStatus.missed:
+          records.where((r) => r.status == IntakeStatus.missed).length,
     };
-
     final filtered = _filter == _DayFilter.all
         ? records
         : records.where((r) => r.status == _filter.toStatus()).toList();
@@ -107,22 +124,24 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             AppTopBar(
               onBellTap: () => BundleNotificationSheet.show(
                 context,
-                time: '21:00',
-                meds: const [
-                  BundleMed(name: '마그네슘', quantity: '1정'),
-                  BundleMed(name: '알레르기 약', quantity: '1정'),
-                ],
+                time: '',
+                meds: const [],
               ),
             ),
             MonthGrid(
-              title: '2025년 5월',
-              cells: _buildCells(),
-              selectedDay: _selectedDay,
-              onPrev: () {},
-              onNext: () {},
-              onSelect: (d) => setState(() => _selectedDay = d),
+              title: '$_viewYear년 $_viewMonth월',
+              cells: _buildCells(marksAsync.value ?? const {}),
+              selectedDay:
+                  (_selectedDate.year == _viewYear &&
+                          _selectedDate.month == _viewMonth)
+                      ? _selectedDate.day
+                      : -1,
+              onPrev: () => _shiftMonth(-1),
+              onNext: () => _shiftMonth(1),
+              onSelect: (d) => setState(() {
+                _selectedDate = DateTime(_viewYear, _viewMonth, d);
+              }),
             ),
-            // 카드 안에는 못 들어가게 분리한 범례
             const Padding(
               padding: EdgeInsets.fromLTRB(22, 0, 22, 14),
               child: CalendarLegend(),
@@ -130,7 +149,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(22, 6, 22, 12),
               child: Text(
-                _recordsTitleFor(_selectedDay),
+                _recordsTitleFor(_selectedDate),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -144,12 +163,18 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               counts: counts,
               total: records.length,
             ),
-            if (filtered.isEmpty)
+            if (dosesAsync.isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                    child: CircularProgressIndicator(strokeWidth: 2.4)),
+              )
+            else if (filtered.isEmpty)
               const _EmptyRecord()
             else
               for (final r in filtered)
                 TimelineRow(
-                  time: r.time,
+                  time: r.timeOfDay,
                   dotColor: _statusColor(r.status),
                   timeColor: _statusColor(r.status),
                   child: _RecordCard(record: r),
@@ -161,10 +186,18 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 }
 
-Color _statusColor(DoseStatus s) => switch (s) {
-      DoseStatus.done => AppColors.calendarCompleted,
-      DoseStatus.scheduled => AppColors.primary,
-      DoseStatus.missed => AppColors.missed,
+Color _statusColor(IntakeStatus s) => switch (s) {
+      IntakeStatus.taken => AppColors.calendarCompleted,
+      IntakeStatus.pending => AppColors.primary,
+      IntakeStatus.missed => AppColors.missed,
+      IntakeStatus.skipped => AppColors.textMuted,
+    };
+
+DoseStatus _toBadgeStatus(IntakeStatus s) => switch (s) {
+      IntakeStatus.taken => DoseStatus.done,
+      IntakeStatus.pending => DoseStatus.scheduled,
+      IntakeStatus.missed => DoseStatus.missed,
+      IntakeStatus.skipped => DoseStatus.done,
     };
 
 // ============================================================
@@ -174,10 +207,10 @@ Color _statusColor(DoseStatus s) => switch (s) {
 enum _DayFilter { all, completed, scheduled, missed }
 
 extension on _DayFilter {
-  DoseStatus toStatus() => switch (this) {
-        _DayFilter.completed => DoseStatus.done,
-        _DayFilter.scheduled => DoseStatus.scheduled,
-        _DayFilter.missed => DoseStatus.missed,
+  IntakeStatus toStatus() => switch (this) {
+        _DayFilter.completed => IntakeStatus.taken,
+        _DayFilter.scheduled => IntakeStatus.pending,
+        _DayFilter.missed => IntakeStatus.missed,
         _DayFilter.all => throw StateError('all has no single status'),
       };
 }
@@ -192,7 +225,7 @@ class _DayFilterRow extends StatelessWidget {
 
   final _DayFilter filter;
   final ValueChanged<_DayFilter> onChange;
-  final Map<DoseStatus, int> counts;
+  final Map<IntakeStatus, int> counts;
   final int total;
 
   @override
@@ -215,7 +248,7 @@ class _DayFilterRow extends StatelessWidget {
             child: FilterPill(
               label: '완료',
               icon: Icons.check_rounded,
-              count: counts[DoseStatus.done] ?? 0,
+              count: counts[IntakeStatus.taken] ?? 0,
               selected: filter == _DayFilter.completed,
               onTap: () => onChange(_DayFilter.completed),
             ),
@@ -225,7 +258,7 @@ class _DayFilterRow extends StatelessWidget {
             child: FilterPill(
               label: '예정',
               icon: Icons.access_time_rounded,
-              count: counts[DoseStatus.scheduled] ?? 0,
+              count: counts[IntakeStatus.pending] ?? 0,
               selected: filter == _DayFilter.scheduled,
               onTap: () => onChange(_DayFilter.scheduled),
             ),
@@ -235,7 +268,7 @@ class _DayFilterRow extends StatelessWidget {
             child: FilterPill(
               label: '놓침',
               icon: Icons.error_outline_rounded,
-              count: counts[DoseStatus.missed] ?? 0,
+              count: counts[IntakeStatus.missed] ?? 0,
               selected: filter == _DayFilter.missed,
               onTap: () => onChange(_DayFilter.missed),
             ),
@@ -252,7 +285,7 @@ class _DayFilterRow extends StatelessWidget {
 
 class _RecordCard extends StatelessWidget {
   const _RecordCard({required this.record});
-  final _Record record;
+  final DoseInstance record;
 
   @override
   Widget build(BuildContext context) {
@@ -265,7 +298,7 @@ class _RecordCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          PillIcon.svg(medName: record.name),
+          PillIcon.svg(medName: record.medicationName),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -275,7 +308,7 @@ class _RecordCard extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        record.name,
+                        record.medicationName,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -284,12 +317,12 @@ class _RecordCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const CategoryChip(label: '영양제'),
+                    CategoryChip.fromCode(record.category ?? 'sup'),
                   ],
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  record.qty,
+                  record.quantityLabel,
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textMuted,
@@ -299,7 +332,7 @@ class _RecordCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          StatusBadge(status: record.status),
+          StatusBadge(status: _toBadgeStatus(record.status)),
         ],
       ),
     );
@@ -327,22 +360,4 @@ class _EmptyRecord extends StatelessWidget {
       ),
     );
   }
-}
-
-// ============================================================
-// 데이터
-// ============================================================
-
-class _Record {
-  const _Record({
-    required this.time,
-    required this.name,
-    required this.qty,
-    required this.status,
-  });
-
-  final String time;
-  final String name;
-  final String qty;
-  final DoseStatus status;
 }
