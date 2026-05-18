@@ -12,6 +12,8 @@ import '../../../core/widgets/category_chip.dart';
 import '../../../core/widgets/donut_progress.dart';
 import '../../../core/widgets/pill_icon.dart';
 import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/sheets/bundle_notification_sheet.dart';
+import '../../../core/widgets/sheets/edit_record_sheet.dart';
 import '../../../core/widgets/stat_grid_4.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/timeline_row.dart';
@@ -103,7 +105,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           children: [
             AppTopBar(
               hasUnread: true,
-              onBellTap: () => context.push(AppRoute.settings),
+              onBellTap: () => BundleNotificationSheet.show(
+                context,
+                time: '21:00',
+                meds: const [
+                  BundleMed(name: '마그네슘', quantity: '1정'),
+                  BundleMed(name: '알레르기 약', quantity: '1정'),
+                ],
+              ),
             ),
             if (_shouldShowBanner)
               Padding(
@@ -135,7 +144,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             _MissedDoseCard(
               name: _missed.name,
               scheduledLabel: _missed.scheduledLabel,
-              onEditRecord: () {},
+              onEditRecord: () => EditRecordSheet.show(
+                context,
+                medName: _missed.name,
+                category: 'sup',
+                time: '21:00',
+                yesterday: true,
+              ),
             ),
             SectionHeader(
               title: '오늘의 복용 일정',

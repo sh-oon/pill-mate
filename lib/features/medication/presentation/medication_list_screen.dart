@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/category_chip.dart';
+import '../../../core/widgets/dialogs/confirm_action_dialog.dart';
 import '../../../core/widgets/filter_pill.dart';
 import '../../../core/widgets/pill_icon.dart';
 import '../../../core/widgets/pill_toggle_switch.dart';
@@ -116,8 +117,18 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
               onToggleAlarm: (v) =>
                   setState(() => _alarmOverrides[m.id] = v),
               onTap: () => context.push(AppRoute.drawerDetailPath(m.id)),
-              onDelete: () {
-                // TODO: show delete confirm dialog
+              onDelete: () async {
+                final ok = await ConfirmActionDialog.show(
+                  context,
+                  title: '${m.name} 삭제',
+                  message: '이 약과 모든 복용 기록이\n함께 삭제됩니다. 되돌릴 수 없어요.',
+                );
+                if (!context.mounted) return;
+                if (ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${m.name} 삭제됨')),
+                  );
+                }
               },
             ),
         ],

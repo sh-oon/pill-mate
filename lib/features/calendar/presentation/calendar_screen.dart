@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_top_bar.dart';
 import '../../../core/widgets/category_chip.dart';
+import '../../../core/widgets/sheets/bundle_notification_sheet.dart';
 import '../../../core/widgets/filter_pill.dart';
 import '../../../core/widgets/pill_icon.dart';
 import '../../../core/widgets/status_badge.dart';
@@ -106,7 +105,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           padding: const EdgeInsets.only(bottom: 140),
           children: [
             AppTopBar(
-              onBellTap: () => context.push(AppRoute.settings),
+              onBellTap: () => BundleNotificationSheet.show(
+                context,
+                time: '21:00',
+                meds: const [
+                  BundleMed(name: '마그네슘', quantity: '1정'),
+                  BundleMed(name: '알레르기 약', quantity: '1정'),
+                ],
+              ),
             ),
             MonthGrid(
               title: '2025년 5월',
