@@ -155,6 +155,8 @@ class AlarmScheduler {
       when,
       NotificationDetails(android: androidDetails, iOS: iosDetails),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
       payload: payload,
     );
   }

@@ -3,6 +3,10 @@ import 'package:drift/drift.dart';
 class Medications extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text().withLength(min: 1, max: 80)();
+
+  /// 'med' (약) | 'sup' (영양제). 카테고리.
+  TextColumn get category => text().withLength(max: 8).nullable()();
+
   TextColumn get dosage => text().withLength(max: 40).nullable()();
   TextColumn get unit => text().withLength(max: 20).nullable()();
   TextColumn get shape => text().withLength(max: 20).nullable()();

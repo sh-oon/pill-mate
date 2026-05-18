@@ -1,0 +1,185 @@
+import 'package:drift/drift.dart';
+
+import '../../../core/database/app_database.dart';
+import '../../../core/database/tables/schedules.dart';
+
+/// 약 + 해당 약의 스케줄들을 한 묶음으로 노출.
+class MedicationWithSchedules {
+  const MedicationWithSchedules({
+    required this.medication,
+    required this.schedules,
+  });
+
+  final Medication medication;
+  final List<Schedule> schedules;
+
+  /// "HH:mm" 시각 리스트 (오름차순).
+  List<String> get times {
+    final list = schedules.map((s) => s.timeOfDay).toList()..sort();
+    return list;
+  }
+
+  /// 첫 스케줄 기준 repeat (모든 스케줄이 동일하다는 전제).
+  RepeatKind get repeatKind =>
+      schedules.isEmpty ? RepeatKind.daily : schedules.first.repeatKind;
+}
+
+/// 신규/수정 시 입력 폼.
+class MedicationDraft {
+  const MedicationDraft({
+    required this.name,
+    required this.category,
+    required this.times,
+    required this.repeatKind,
+    this.dosage,
+    this.unit,
+    this.daysOfWeekMask,
+    this.intervalDays,
+    this.memo,
+  });
+
+  final String name;
+
+  /// 'med' | 'sup'
+  final String category;
+
+  /// "HH:mm" list. 비어 있으면 필요시 복용 (PRN).
+  final List<String> times;
+  final RepeatKind repeatKind;
+  final String? dosage;
+  final String? unit;
+  final int? daysOfWeekMask;
+  final int? intervalDays;
+  final String? memo;
+}
+
+class MedicationRepository {
+  MedicationRepository(this._db);
+
+  final AppDatabase _db;
+
+  /// 활성(미아카이브) 약 전체 + 스케줄을 실시간 스트림으로.
+  Stream<List<MedicationWithSchedules>> watchAll() {
+    final query = (_db.select(_db.medications)
+          ..where((m) => m.archived.equals(false))
+          ..orderBy([(m) => OrderingTerm.asc(m.name)]))
+        .watch();
+
+    return query.asyncMap((meds) async {
+      if (meds.isEmpty) return const <MedicationWithSchedules>[];
+      final ids = meds.map((m) => m.id).toList();
+      final scheds = await (_db.select(_db.schedules)
+            ..where((s) => s.medicationId.isIn(ids) & s.enabled.equals(true)))
+          .get();
+      final byMedId = <int, List<Schedule>>{};
+      for (final s in scheds) {
+        (byMedId[s.medicationId] ??= []).add(s);
+      }
+      return [
+        for (final m in meds)
+          MedicationWithSchedules(
+            medication: m,
+            schedules: byMedId[m.id] ?? const [],
+          ),
+      ];
+    });
+  }
+
+  Stream<MedicationWithSchedules?> watchById(int id) {
+    final medStream = (_db.select(_db.medications)
+          ..where((m) => m.id.equals(id)))
+        .watchSingleOrNull();
+    return medStream.asyncMap((med) async {
+      if (med == null) return null;
+      final scheds = await (_db.select(_db.schedules)
+            ..where((s) => s.medicationId.equals(id)))
+          .get();
+      return MedicationWithSchedules(medication: med, schedules: scheds);
+    });
+  }
+
+  Future<MedicationWithSchedules?> getById(int id) async {
+    final med = await (_db.select(_db.medications)
+          ..where((m) => m.id.equals(id)))
+        .getSingleOrNull();
+    if (med == null) return null;
+    final scheds = await (_db.select(_db.schedules)
+          ..where((s) => s.medicationId.equals(id)))
+        .get();
+    return MedicationWithSchedules(medication: med, schedules: scheds);
+  }
+
+  /// 신규 등록. 트랜잭션으로 medication + schedules 동시 insert.
+  Future<int> insertWithSchedules(MedicationDraft draft) {
+    return _db.transaction(() async {
+      final medId = await _db.into(_db.medications).insert(
+            MedicationsCompanion.insert(
+              name: draft.name,
+              category: Value(draft.category),
+              dosage: Value(draft.dosage),
+              unit: Value(draft.unit),
+              memo: Value(draft.memo),
+            ),
+          );
+      final now = DateTime.now();
+      final startOfToday = DateTime(now.year, now.month, now.day);
+      for (final t in draft.times) {
+        await _db.into(_db.schedules).insert(
+              SchedulesCompanion.insert(
+                medicationId: medId,
+                timeOfDay: t,
+                startDate: startOfToday,
+                repeatKind: Value(draft.repeatKind),
+                daysOfWeekMask: Value(draft.daysOfWeekMask),
+                intervalDays: Value(draft.intervalDays),
+              ),
+            );
+      }
+      return medId;
+    });
+  }
+
+  /// 기존 약 수정. 스케줄은 통째로 교체(단순).
+  Future<void> updateWithSchedules(int id, MedicationDraft draft) {
+    return _db.transaction(() async {
+      await (_db.update(_db.medications)..where((m) => m.id.equals(id))).write(
+        MedicationsCompanion(
+          name: Value(draft.name),
+          category: Value(draft.category),
+          dosage: Value(draft.dosage),
+          unit: Value(draft.unit),
+          memo: Value(draft.memo),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+      await (_db.delete(_db.schedules)..where((s) => s.medicationId.equals(id)))
+          .go();
+      final now = DateTime.now();
+      final startOfToday = DateTime(now.year, now.month, now.day);
+      for (final t in draft.times) {
+        await _db.into(_db.schedules).insert(
+              SchedulesCompanion.insert(
+                medicationId: id,
+                timeOfDay: t,
+                startDate: startOfToday,
+                repeatKind: Value(draft.repeatKind),
+                daysOfWeekMask: Value(draft.daysOfWeekMask),
+                intervalDays: Value(draft.intervalDays),
+              ),
+            );
+      }
+    });
+  }
+
+  /// hard delete (cascade로 schedules/intake_logs 같이 사라짐).
+  Future<void> delete(int id) {
+    return (_db.delete(_db.medications)..where((m) => m.id.equals(id))).go();
+  }
+
+  /// 알람 on/off (모든 스케줄 enabled toggle).
+  Future<void> setAlarmEnabled(int medicationId, bool enabled) {
+    return (_db.update(_db.schedules)
+          ..where((s) => s.medicationId.equals(medicationId)))
+        .write(SchedulesCompanion(enabled: Value(enabled)));
+  }
+}
