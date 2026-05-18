@@ -5,7 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/calendar/presentation/calendar_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
-import '../../features/medication/presentation/medication_form_screen.dart';
+import '../../features/medication/presentation/add/medication_add_flow.dart';
+import '../../features/medication/presentation/medication_detail_screen.dart';
 import '../../features/medication/presentation/medication_list_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
@@ -20,7 +21,11 @@ class AppRoute {
   static const home = '/';
   static const drawer = '/drawer';
   static const drawerNew = '/drawer/new';
+  static const drawerDetail = '/drawer/:id'; // 동적 (드로어 id)
   static const drawerEdit = '/drawer/:id/edit';
+
+  /// 동적 detail 경로 helper.
+  static String drawerDetailPath(int id) => '/drawer/$id';
   static const reports = '/reports';
   static const calendar = '/calendar';
   static const settings = '/settings';
@@ -73,16 +78,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'new',
-                    builder: (context, state) =>
-                        const MedicationFormScreen(medicationId: null),
+                    builder: (context, state) => const MedicationAddFlow(),
                   ),
                   GoRoute(
-                    path: ':id/edit',
+                    path: ':id',
                     builder: (context, state) {
-                      final id =
-                          int.tryParse(state.pathParameters['id'] ?? '');
-                      return MedicationFormScreen(medicationId: id);
+                      final id = int.tryParse(
+                              state.pathParameters['id'] ?? '') ??
+                          1;
+                      return MedicationDetailScreen(medicationId: id);
                     },
+                    routes: [
+                      GoRoute(
+                        path: 'edit',
+                        builder: (context, state) {
+                          final id = int.tryParse(
+                              state.pathParameters['id'] ?? '');
+                          return MedicationAddFlow(medicationId: id);
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),

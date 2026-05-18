@@ -115,9 +115,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
               alarmOverride: _alarmOverrides[m.id],
               onToggleAlarm: (v) =>
                   setState(() => _alarmOverrides[m.id] = v),
-              onTap: () {
-                // TODO: navigate to detail
-              },
+              onTap: () => context.push(AppRoute.drawerDetailPath(m.id)),
               onDelete: () {
                 // TODO: show delete confirm dialog
               },
