@@ -75,17 +75,14 @@ class WeeklyBarChart extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: 130,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 18),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  for (final b in bars)
-                    Expanded(child: _Bar(bar: b)),
-                ],
-              ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (final b in bars)
+                  Expanded(child: _Bar(bar: b)),
+              ],
             ),
           ),
         ],
@@ -117,19 +114,18 @@ class _Bar extends StatelessWidget {
         Container(
           width: 22,
           height: 90,
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: AppColors.border,
             borderRadius: BorderRadius.circular(11),
           ),
-          alignment: Alignment.bottomCenter,
-          child: AnimatedFractionallySizedBox(
-            duration: const Duration(milliseconds: 220),
-            heightFactor: bar.percent / 100,
-            child: Container(
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(11),
-              ),
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: AnimatedFractionallySizedBox(
+              duration: const Duration(milliseconds: 220),
+              heightFactor: bar.percent / 100,
+              widthFactor: 1.0,
+              child: ColoredBox(color: color),
             ),
           ),
         ),
