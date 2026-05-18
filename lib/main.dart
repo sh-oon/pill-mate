@@ -6,6 +6,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
+import 'core/notifications/medication_notification_manager.dart';
+import 'core/notifications/notification_action_handler.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/storage/onboarding_storage.dart';
 
@@ -21,8 +23,15 @@ Future<void> main() async {
     ],
   );
 
+  // 알림 액션 핸들러를 글로벌 hook에 등록 (foreground 콜백용).
+  registerGlobalActionHandler(NotificationActionHandler(container));
+
   // 알림 인프라는 백그라운드에서 초기화 (스플래시 노출 지연 방지).
-  unawaited(container.read(notificationServiceProvider).init());
+  // 초기화 완료 후 DB 기반 스케줄을 시스템 알림에 동기화 (앱 재설치/업데이트 대비).
+  unawaited(() async {
+    await container.read(notificationServiceProvider).init();
+    await container.read(medicationNotificationManagerProvider).syncAll();
+  }());
 
   runApp(
     UncontrolledProviderScope(
