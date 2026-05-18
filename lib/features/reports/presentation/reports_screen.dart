@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_top_bar.dart';
 import '../../../core/widgets/sheets/bundle_notification_sheet.dart';
+import '../../medication/data/reports_providers.dart';
 import 'widgets/metric_card_list.dart';
 import 'widgets/period_tabs.dart';
 import 'widgets/stat_card_2x2.dart';
@@ -20,19 +21,14 @@ class ReportsScreen extends ConsumerStatefulWidget {
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   ReportPeriod _period = ReportPeriod.weekly;
 
-  // --- 시안 fixture ---
-  static const _weeklyBars = [
-    WeeklyBar(day: '금', percent: 71),
-    WeeklyBar(day: '토', percent: 86),
-    WeeklyBar(day: '일', percent: 100),
-    WeeklyBar(day: '월', percent: 71),
-    WeeklyBar(day: '화', percent: 57, isRisk: true),
-    WeeklyBar(day: '수', percent: 86),
-    WeeklyBar(day: '오늘', percent: 80, isToday: true),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final summaryAsync = ref.watch(weeklySummaryProvider);
+    final percentsAsync = ref.watch(dailyPercentsProvider);
+    final streakAsync = ref.watch(streakProvider);
+    final bestTimeAsync = ref.watch(bestTimeOfDayProvider);
+    final totalAsync = ref.watch(weeklyTotalCompletedProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -43,84 +39,154 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             AppTopBar(
               onBellTap: () => BundleNotificationSheet.show(
                 context,
-                time: '21:00',
-                meds: const [
-                  BundleMed(name: '마그네슘', quantity: '1정'),
-                  BundleMed(name: '알레르기 약', quantity: '1정'),
-                ],
+                time: '',
+                meds: const [],
               ),
             ),
             PeriodTabs(
               value: _period,
               onChange: (v) => setState(() => _period = v),
             ),
-            const WeekSummaryCard(
-              label: '이번 주 리포트',
-              dateRange: '5월 10일 - 5월 16일',
-              progress: 0.8,
-              done: 28,
-              total: 35,
-              deltaPercent: 5,
+            summaryAsync.when(
+              loading: () => const _LoadingCard(height: 280),
+              error: (e, _) => _ErrorCard(error: e),
+              data: (s) => WeekSummaryCard(
+                label: '이번 주 리포트',
+                dateRange: weekRangeLabel(s.weekStart, s.weekEnd),
+                progress: s.progress,
+                done: s.done,
+                total: s.total,
+                deltaPercent: 0, // 이전 주 비교는 추후 구현
+              ),
             ),
-            const StatCard2x2(
-              cards: [
-                StatCardSpec(
-                  icon: Icons.check_rounded,
-                  label: '완료',
-                  count: 28,
-                  tone: StatTone.completed,
-                ),
-                StatCardSpec(
-                  icon: Icons.access_time_rounded,
-                  label: '예정',
-                  count: 5,
-                  tone: StatTone.scheduled,
-                ),
-                StatCardSpec(
-                  icon: Icons.error_outline_rounded,
-                  label: '놓침',
-                  count: 2,
-                  tone: StatTone.missed,
-                ),
-                StatCardSpec(
-                  icon: Icons.format_list_bulleted_rounded,
-                  label: '전체',
-                  count: 35,
-                  tone: StatTone.total,
-                ),
-              ],
+            summaryAsync.when(
+              loading: () => const _LoadingCard(height: 160),
+              error: (_, _) => const SizedBox.shrink(),
+              data: (s) => StatCard2x2(
+                cards: [
+                  StatCardSpec(
+                    icon: Icons.check_rounded,
+                    label: '완료',
+                    count: s.done,
+                    tone: StatTone.completed,
+                  ),
+                  StatCardSpec(
+                    icon: Icons.access_time_rounded,
+                    label: '예정',
+                    count: s.pending,
+                    tone: StatTone.scheduled,
+                  ),
+                  StatCardSpec(
+                    icon: Icons.error_outline_rounded,
+                    label: '놓침',
+                    count: s.missed,
+                    tone: StatTone.missed,
+                  ),
+                  StatCardSpec(
+                    icon: Icons.format_list_bulleted_rounded,
+                    label: '전체',
+                    count: s.total,
+                    tone: StatTone.total,
+                  ),
+                ],
+              ),
             ),
-            const MetricCardList(
+            MetricCardList(
               rows: [
                 MetricRowSpec(
                   icon: Icons.water_drop_outlined,
                   label: '연속 복용',
-                  sublabel: '최고 12일 기록',
-                  value: '7일',
+                  sublabel: '오늘까지 모두 챙긴 일수',
+                  value: streakAsync.when(
+                    loading: () => '…',
+                    error: (_, _) => '-',
+                    data: (n) => '$n일',
+                  ),
                   tone: MetricTone.blue,
                 ),
                 MetricRowSpec(
                   icon: Icons.access_time_rounded,
                   label: '가장 잘 챙긴 시간대',
-                  sublabel: '완료율 92%',
-                  value: '오전 8시',
+                  sublabel: bestTimeAsync.when(
+                    loading: () => '계산 중',
+                    error: (_, _) => '-',
+                    data: (b) => b == null
+                        ? '데이터 부족'
+                        : '완료율 ${(b.completionRate * 100).round()}%',
+                  ),
+                  value: bestTimeAsync.when(
+                    loading: () => '…',
+                    error: (_, _) => '-',
+                    data: (b) => b?.timeOfDay ?? '-',
+                  ),
                   tone: MetricTone.purple,
                 ),
                 MetricRowSpec(
                   icon: Icons.event_available_rounded,
                   label: '총 완료 횟수',
                   sublabel: '이번 주 합계',
-                  value: '28회',
+                  value: totalAsync.when(
+                    loading: () => '…',
+                    error: (_, _) => '-',
+                    data: (n) => '$n회',
+                  ),
                   tone: MetricTone.green,
                 ),
               ],
             ),
-            WeeklyBarChart(
-              bars: _weeklyBars,
-              onDetailTap: () {},
+            percentsAsync.when(
+              loading: () => const _LoadingCard(height: 220),
+              error: (_, _) => const SizedBox.shrink(),
+              data: (list) => WeeklyBarChart(
+                bars: [
+                  for (final p in list)
+                    WeeklyBar(
+                      day: shortKoreanDay(p.date),
+                      percent: p.percent,
+                      isToday: p.isToday,
+                      isRisk: p.percent < 60,
+                    ),
+                ],
+                onDetailTap: () {},
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LoadingCard extends StatelessWidget {
+  const _LoadingCard({required this.height});
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(22, 0, 22, 14),
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: const Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
+    );
+  }
+}
+
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({required this.error});
+  final Object error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(22),
+      child: Text(
+        '불러오기 실패: $error',
+        style: const TextStyle(fontSize: 13, color: AppColors.missed),
       ),
     );
   }
