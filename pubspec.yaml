@@ -47,6 +47,9 @@ dependencies:
   # Native iOS Liquid Glass widgets (real UIKit via PlatformView)
   cupertino_native_better: ^1.4.5
 
+  # iOS-style swipe actions (sticky delete button)
+  flutter_slidable: ^4.0.0
+
   # Codegen / model utilities
   freezed_annotation: ^3.1.0
   json_annotation: ^4.9.0
