@@ -95,8 +95,9 @@ class _MedicationDetailScreenState
               child: Row(
                 children: [
                   Expanded(
-                    child: DangerButton(
+                    child: AppButton(
                       label: '삭제하기',
+                      variant: AppButtonVariant.danger,
                       fullWidth: true,
                       onPressed: () async {
                         final ok = await ConfirmActionDialog.show(
@@ -116,7 +117,7 @@ class _MedicationDetailScreenState
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: PrimaryButton(
+                    child: AppButton(
                       label: '수정하기',
                       fullWidth: true,
                       onPressed: () => context.push(

@@ -79,7 +79,7 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(22, 16, 22, 16),
-              child: PrimaryButton(
+              child: AppButton(
                 label: _nextLabel,
                 onPressed: _canProceed ? _next : null,
                 size: AppButtonSize.lg,

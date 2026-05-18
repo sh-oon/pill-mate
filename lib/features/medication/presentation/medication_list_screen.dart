@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_buttons.dart';
 import '../../../core/widgets/category_chip.dart';
 import '../../../core/widgets/dialogs/confirm_action_dialog.dart';
 import '../../../core/widgets/filter_pill.dart';
@@ -133,11 +134,8 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
             ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+      floatingActionButton: AppFab(
         onPressed: () => context.push(AppRoute.drawerNew),
-        child: const Icon(Icons.add, size: 30),
       ),
     );
   }

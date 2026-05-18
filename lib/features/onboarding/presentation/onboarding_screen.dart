@@ -7,6 +7,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/storage/onboarding_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_buttons.dart';
 import 'widgets/feature_card.dart';
 import 'widgets/pil_mascot.dart';
 
@@ -79,21 +80,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               const SizedBox(height: 32),
               const _FeatureList(),
               const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _busy ? null : _start,
-                  child: _busy
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.4,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('시작하기'),
-                ),
+              AppButton(
+                label: '시작하기',
+                onPressed: _busy ? null : _start,
+                size: AppButtonSize.lg,
+                fullWidth: true,
+                loading: _busy,
               ),
             ],
           ),

@@ -87,15 +87,17 @@ class EditRecordSheet extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: _SecondaryButton(
+                  child: AppButton(
                     label: '그대로 둘게요',
+                    variant: AppButtonVariant.primaryTint,
+                    fullWidth: true,
                     onPressed: () => Navigator.of(context)
                         .pop(EditRecordChoice.keep),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: PrimaryButton(
+                  child: AppButton(
                     label: '먹었던 걸로',
                     fullWidth: true,
                     onPressed: () => Navigator.of(context)
@@ -222,29 +224,3 @@ class _MedInfoCard extends StatelessWidget {
   }
 }
 
-/// `.btpo` — primaryTint 배경 + primary 텍스트 보조 버튼.
-class _SecondaryButton extends StatelessWidget {
-  const _SecondaryButton({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton(
-      onPressed: onPressed,
-      style: FilledButton.styleFrom(
-        backgroundColor: AppColors.primaryTint,
-        foregroundColor: AppColors.primary,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        minimumSize: const Size(0, 44),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-        textStyle:
-            const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-      ),
-      child: Text(label),
-    );
-  }
-}

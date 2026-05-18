@@ -95,22 +95,24 @@ class ConfirmActionDialog extends StatelessWidget {
             const SizedBox(height: 22),
             Row(
               children: [
-                Expanded(child: _CancelButton(label: cancelLabel)),
+                Expanded(
+                  child: AppButton(
+                    label: cancelLabel,
+                    variant: AppButtonVariant.secondary,
+                    fullWidth: true,
+                    onPressed: () => Navigator.of(context).pop<bool>(false),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: destructive
-                      ? DangerButton(
-                          label: confirmLabel,
-                          fullWidth: true,
-                          onPressed: () =>
-                              Navigator.of(context).pop<bool>(true),
-                        )
-                      : PrimaryButton(
-                          label: confirmLabel,
-                          fullWidth: true,
-                          onPressed: () =>
-                              Navigator.of(context).pop<bool>(true),
-                        ),
+                  child: AppButton(
+                    label: confirmLabel,
+                    variant: destructive
+                        ? AppButtonVariant.danger
+                        : AppButtonVariant.primary,
+                    fullWidth: true,
+                    onPressed: () => Navigator.of(context).pop<bool>(true),
+                  ),
                 ),
               ],
             ),
@@ -121,27 +123,3 @@ class ConfirmActionDialog extends StatelessWidget {
   }
 }
 
-/// `.bts` — 회색 secondary 취소 버튼.
-class _CancelButton extends StatelessWidget {
-  const _CancelButton({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton(
-      onPressed: () => Navigator.of(context).pop<bool>(false),
-      style: FilledButton.styleFrom(
-        backgroundColor: AppColors.border,
-        foregroundColor: AppColors.textStrong,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        minimumSize: const Size(0, 44),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-        textStyle:
-            const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-      ),
-      child: Text(label),
-    );
-  }
-}

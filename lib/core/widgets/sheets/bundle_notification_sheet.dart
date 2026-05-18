@@ -96,7 +96,7 @@ class _BundleNotificationSheetState extends State<BundleNotificationSheet> {
                   Row(
                     children: [
                       Expanded(
-                        child: PrimaryButton(
+                        child: AppButton(
                           label: '전부 먹었어요',
                           fullWidth: true,
                           onPressed: () => Navigator.of(context).pop(),
@@ -104,7 +104,10 @@ class _BundleNotificationSheetState extends State<BundleNotificationSheet> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: _SnoozeButton(
+                        child: AppButton(
+                          label: '1시간 뒤에',
+                          variant: AppButtonVariant.primaryTint,
+                          fullWidth: true,
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                       ),
@@ -292,27 +295,3 @@ class _Item extends StatelessWidget {
   }
 }
 
-/// "1시간 뒤에" — primaryTint bg + primary fg secondary 버튼.
-class _SnoozeButton extends StatelessWidget {
-  const _SnoozeButton({required this.onPressed});
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton(
-      onPressed: onPressed,
-      style: FilledButton.styleFrom(
-        backgroundColor: AppColors.primaryTint,
-        foregroundColor: AppColors.primary,
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        minimumSize: const Size(0, 44),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        textStyle:
-            const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-      ),
-      child: const Text('1시간 뒤에'),
-    );
-  }
-}

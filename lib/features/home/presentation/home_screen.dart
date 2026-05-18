@@ -17,6 +17,7 @@ import '../../../core/widgets/sheets/edit_record_sheet.dart';
 import '../../../core/widgets/stat_grid_4.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/timeline_row.dart';
+import '../../../core/widgets/touchable_badge.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -154,11 +155,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             SectionHeader(
               title: '오늘의 복용 일정',
-              action: OutlinePillButton(
+              action: TouchableBadge(
                 label: '전체보기',
-                onPressed: () {},
                 trailingIcon: Icons.chevron_right,
-                compact: true,
+                onTap: () {},
               ),
             ),
             for (final slot in _schedule)
@@ -169,11 +169,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+      floatingActionButton: AppFab(
         onPressed: () => context.push(AppRoute.drawerNew),
-        child: const Icon(Icons.add, size: 30),
       ),
     );
   }
@@ -433,10 +430,17 @@ class _MissedDoseCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              OutlinePillButton(
+              AppButton(
                 label: '기록 수정',
                 onPressed: onEditRecord,
-                color: AppColors.missed,
+                variant: AppButtonVariant.outline,
+                size: AppButtonSize.sm,
+                style: const AppButtonStyle(
+                  foregroundColor: AppColors.missed,
+                  borderColor: AppColors.missed,
+                  radius: 10,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -541,7 +545,7 @@ class _DoseRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         showTakeButton
-            ? PrimaryButton(
+            ? AppButton(
                 label: '먹었어요',
                 onPressed: onTaken,
                 size: AppButtonSize.sm,
@@ -601,14 +605,15 @@ class _PermissionBanner extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 8),
-                TextButton(
+                AppButton(
+                  label: permanentlyDenied ? '설정 열기' : '허용하기',
                   onPressed: onRequest,
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    minimumSize: const Size(0, 32),
+                  variant: AppButtonVariant.ghost,
+                  size: AppButtonSize.sm,
+                  style: const AppButtonStyle(
                     foregroundColor: AppColors.missed,
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   ),
-                  child: Text(permanentlyDenied ? '설정 열기' : '허용하기'),
                 ),
               ],
             ),
