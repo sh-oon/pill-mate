@@ -101,19 +101,64 @@ class MedicationNotificationManager {
 
   Future<void> _scheduleDaily(Medication med, Schedule s) async {
     final next = _nextOccurrence(s.timeOfDay);
+
+    // 1) N분 전 사전 알림 (daily 반복).
+    if ((s.remindBeforeMinutes ?? 0) > 0) {
+      final preTime =
+          _subtractMinutes(s.timeOfDay, s.remindBeforeMinutes!);
+      final preNext = _nextOccurrence(preTime);
+      await _plugin.zonedSchedule(
+        _preReminderIdFor(s),
+        '${med.name} 복용 ${s.remindBeforeMinutes}분 전',
+        '곧 복용 시간입니다.',
+        preNext,
+        _details(NotifTone.reminder),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: _payload(s, next), // 원래 시각 그대로 (액션은 원슬롯)
+      );
+    }
+
+    // 2) onTime — 본 알림.
     await _plugin.zonedSchedule(
       _dailyIdFor(s),
       '${med.name} 복용 시간',
       _quantityHint(med),
       next,
-      _details(urgent: false),
+      _details(NotifTone.onTime),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time, // 매일 같은 시각 반복
       payload: _payload(s, next),
     );
+
+    // 3) urgent 재알림 — 단발 K개 (오늘 분만).
+    if ((s.urgentRepeatMinutes ?? 0) > 0) {
+      final max = s.urgentMaxRepeats ?? defaultUrgentMaxRepeats;
+      final now = tz.TZDateTime.now(tz.local);
+      for (var n = 1; n <= max; n++) {
+        final at = next.add(Duration(minutes: s.urgentRepeatMinutes! * n));
+        if (!at.isAfter(now)) continue;
+        await _plugin.zonedSchedule(
+          _urgentIdFor(s, n),
+          '⚠️ ${med.name} 미복용 알림',
+          '아직 복용 체크가 되지 않았어요. 지금 확인해주세요.',
+          at,
+          _details(NotifTone.urgent),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          // 단발 (matchDateTimeComponents 생략)
+          payload: _payload(s, next),
+        );
+      }
+    }
   }
+
+  static const int defaultUrgentMaxRepeats = 6;
 
   Future<void> _scheduleWeekly(Medication med, Schedule s) async {
     final mask = s.daysOfWeekMask ?? 0;
@@ -127,7 +172,7 @@ class MedicationNotificationManager {
         '${med.name} 복용 시간',
         _quantityHint(med),
         next,
-        _details(urgent: false),
+        _details(NotifTone.onTime),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
@@ -142,12 +187,31 @@ class MedicationNotificationManager {
     for (var wd = 1; wd <= 7; wd++) {
       await _plugin.cancel(_weeklyIdFor(s, wd));
     }
+    await _plugin.cancel(_preReminderIdFor(s));
+    await _cancelUrgentSlots(s.id, max: 32);
+  }
+
+  /// 오늘 (또는 미래) 등록된 urgent 단발 알림들을 모두 취소.
+  /// 사용자가 액션(taken/skipped) 후 호출되어 추가 발화 막음.
+  Future<void> cancelUrgentForSchedule(int scheduleId, {int max = 32}) =>
+      _cancelUrgentSlots(scheduleId, max: max);
+
+  Future<void> _cancelUrgentSlots(int scheduleId, {required int max}) async {
+    for (var n = 1; n <= max; n++) {
+      await _plugin.cancel(_urgentIdForSched(scheduleId, n));
+    }
   }
 
   // --- ID 규칙 ----------------------------------------------------------
+  //
+  // daily/weekly/preReminder는 scheduleId * 10 + [0..9] 범위.
+  // urgent는 scheduleId * 1000 + [101..199] 범위 → 자릿수 분리로 충돌 없음.
 
   int _dailyIdFor(Schedule s) => s.id * 10;
   int _weeklyIdFor(Schedule s, int weekday) => s.id * 10 + weekday;
+  int _preReminderIdFor(Schedule s) => s.id * 10 + 9;
+  int _urgentIdFor(Schedule s, int n) => s.id * 1000 + 100 + n;
+  int _urgentIdForSched(int scheduleId, int n) => scheduleId * 1000 + 100 + n;
 
   // --- 시각 계산 ---------------------------------------------------------
 
@@ -159,6 +223,16 @@ class MedicationNotificationManager {
     var t = tz.TZDateTime(tz.local, now.year, now.month, now.day, h, m);
     if (!t.isAfter(now)) t = t.add(const Duration(days: 1));
     return t;
+  }
+
+  /// "HH:mm"에서 N분 뺀 새 "HH:mm" (음수면 전날로 wrap).
+  String _subtractMinutes(String hhmm, int minutes) {
+    final parts = hhmm.split(':');
+    var totalMin = int.parse(parts[0]) * 60 + int.parse(parts[1]) - minutes;
+    if (totalMin < 0) totalMin += 24 * 60;
+    final h = (totalMin ~/ 60).toString().padLeft(2, '0');
+    final m = (totalMin % 60).toString().padLeft(2, '0');
+    return '$h:$m';
   }
 
   tz.TZDateTime _nextWeeklyOccurrence(String hhmm, int weekday) {
@@ -175,14 +249,21 @@ class MedicationNotificationManager {
 
   // --- 알림 세부 -----------------------------------------------------------
 
-  NotificationDetails _details({required bool urgent}) {
+  NotificationDetails _details(NotifTone tone) {
+    final channelId = switch (tone) {
+      NotifTone.reminder => NotificationChannels.reminderId,
+      NotifTone.onTime => NotificationChannels.onTimeId,
+      NotifTone.urgent => NotificationChannels.urgentId,
+    };
+    final channelName = switch (tone) {
+      NotifTone.reminder => NotificationChannels.reminderName,
+      NotifTone.onTime => NotificationChannels.onTimeName,
+      NotifTone.urgent => NotificationChannels.urgentName,
+    };
+    final urgent = tone == NotifTone.urgent;
     final android = AndroidNotificationDetails(
-      urgent
-          ? NotificationChannels.urgentId
-          : NotificationChannels.onTimeId,
-      urgent
-          ? NotificationChannels.urgentName
-          : NotificationChannels.onTimeName,
+      channelId,
+      channelName,
       importance: urgent ? Importance.max : Importance.high,
       priority: urgent ? Priority.max : Priority.high,
       category: AndroidNotificationCategory.alarm,
@@ -234,6 +315,9 @@ class MedicationNotificationManager {
     return 'dose:${s.id}:${s.medicationId}:${local.toIso8601String()}';
   }
 }
+
+/// 알림 톤 — 채널/중요도 결정용.
+enum NotifTone { reminder, onTime, urgent }
 
 final medicationNotificationManagerProvider =
     Provider<MedicationNotificationManager>((ref) {
