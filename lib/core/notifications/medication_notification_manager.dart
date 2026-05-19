@@ -261,6 +261,7 @@ class MedicationNotificationManager {
     }
     await _plugin.cancel(_preReminderIdFor(s));
     await _cancelUrgentSlots(s.id, max: 32);
+    await _plugin.cancel(_snoozeIdForSched(s.id));
     // Interval occurrences cancel + DB 큐 비우기.
     final occs = await (_db.select(_db.intervalOccurrences)
           ..where((o) => o.scheduleId.equals(s.id)))
@@ -284,6 +285,45 @@ class MedicationNotificationManager {
     }
   }
 
+  /// 한 슬롯에 대해 [delay] 뒤 일회성 스누즈 알림 등록.
+  ///
+  /// daily/weekly 본 알림은 그대로 두고, 스누즈 슬롯(`scheduleId*10+8`)에
+  /// 단발로 추가 등록. 기존 스누즈가 있으면 cancel 후 새로 (마지막 호출만 살아남음).
+  Future<void> scheduleSnooze({
+    required int scheduleId,
+    required int medicationId,
+    required DateTime originalScheduledAt,
+    Duration delay = const Duration(minutes: 10),
+  }) async {
+    await _plugin.cancel(_snoozeIdForSched(scheduleId));
+    final med = await (_db.select(_db.medications)
+          ..where((m) => m.id.equals(medicationId)))
+        .getSingleOrNull();
+    if (med == null || med.archived) return;
+
+    final when = tz.TZDateTime.from(
+      DateTime.now().add(delay),
+      tz.local,
+    );
+
+    await _plugin.zonedSchedule(
+      _snoozeIdForSched(scheduleId),
+      '${med.name} 복용 시간 (다시 알림)',
+      _quantityHint(med),
+      when,
+      _details(NotifTone.onTime),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      // matchDateTimeComponents 생략 → 단 한 번만 발화
+      payload: _payloadRaw(
+        scheduleId: scheduleId,
+        medicationId: medicationId,
+        when: originalScheduledAt,
+      ),
+    );
+  }
+
   // --- ID 규칙 ----------------------------------------------------------
   // daily/weekly/preReminder: scheduleId * 10 + [0..9]
   //   (pre=9, daily=0, weekly=1..7)
@@ -292,6 +332,7 @@ class MedicationNotificationManager {
 
   int _dailyIdFor(Schedule s) => s.id * 10;
   int _weeklyIdFor(Schedule s, int weekday) => s.id * 10 + weekday;
+  int _snoozeIdForSched(int scheduleId) => scheduleId * 10 + 8;
   int _preReminderIdFor(Schedule s) => s.id * 10 + 9;
   int _urgentIdFor(Schedule s, int n) => s.id * 1000 + 100 + n;
   int _urgentIdForSched(int scheduleId, int n) => scheduleId * 1000 + 100 + n;
@@ -398,11 +439,28 @@ class MedicationNotificationManager {
   String _payload(Schedule s, tz.TZDateTime when) {
     final local = DateTime(
         when.year, when.month, when.day, when.hour, when.minute);
-    return _payloadAt(s, local);
+    return _payloadRaw(
+      scheduleId: s.id,
+      medicationId: s.medicationId,
+      when: local,
+    );
   }
 
+  /// Interval occurrence처럼 임의의 DateTime으로 payload 생성하는 경우.
   String _payloadAt(Schedule s, DateTime when) {
-    return 'dose:${s.id}:${s.medicationId}:${when.toIso8601String()}';
+    return _payloadRaw(
+      scheduleId: s.id,
+      medicationId: s.medicationId,
+      when: when,
+    );
+  }
+
+  String _payloadRaw({
+    required int scheduleId,
+    required int medicationId,
+    required DateTime when,
+  }) {
+    return 'dose:$scheduleId:$medicationId:${when.toIso8601String()}';
   }
 
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
