@@ -9,6 +9,7 @@ import 'app.dart';
 import 'core/notifications/medication_notification_manager.dart';
 import 'core/notifications/notification_action_handler.dart';
 import 'core/notifications/notification_service.dart';
+import 'core/router/app_router.dart';
 import 'core/storage/onboarding_storage.dart';
 
 Future<void> main() async {
@@ -28,15 +29,34 @@ Future<void> main() async {
 
   // 알림 인프라는 백그라운드에서 초기화 (스플래시 노출 지연 방지).
   // 초기화 완료 후 DB 기반 스케줄을 시스템 알림에 동기화 (앱 재설치/업데이트 대비).
-  unawaited(() async {
-    await container.read(notificationServiceProvider).init();
-    await container.read(medicationNotificationManagerProvider).syncAll();
-  }());
+  // launch details 조회는 init 직후여야 정확 → await 분기 필요.
+  String? pendingDeepLink;
+  await container.read(notificationServiceProvider).init();
+  pendingDeepLink = await _resolveColdStartDeepLink(container);
+  unawaited(
+    container.read(medicationNotificationManagerProvider).syncAll(),
+  );
 
   runApp(
     UncontrolledProviderScope(
       container: container,
-      child: const PillMateApp(),
+      child: PillMateApp(pendingDeepLink: pendingDeepLink),
     ),
   );
+}
+
+/// 알림으로 cold start된 경우 deep link 경로 추출. 없으면 null.
+Future<String?> _resolveColdStartDeepLink(ProviderContainer container) async {
+  try {
+    final launch = await container
+        .read(notificationServiceProvider)
+        .plugin
+        .getNotificationAppLaunchDetails();
+    if (launch?.didNotificationLaunchApp != true) return null;
+    final payload = parseDosePayload(launch?.notificationResponse?.payload);
+    if (payload == null) return null;
+    return '${AppRoute.drawer}/${payload.medicationId}';
+  } catch (_) {
+    return null;
+  }
 }

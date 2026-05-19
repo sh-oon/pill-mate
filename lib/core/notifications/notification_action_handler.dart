@@ -3,11 +3,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/medication/data/intake_providers.dart';
+import '../router/app_router.dart';
 import 'notification_channels.dart';
 
 /// 알림 payload 파싱 결과 — `dose:scheduleId:medicationId:isoScheduledAt`.
-class _DosePayload {
-  const _DosePayload({
+class DosePayload {
+  const DosePayload({
     required this.scheduleId,
     required this.medicationId,
     required this.scheduledAt,
@@ -16,23 +17,24 @@ class _DosePayload {
   final int scheduleId;
   final int medicationId;
   final DateTime scheduledAt;
+}
 
-  static _DosePayload? parse(String? raw) {
-    if (raw == null || raw.isEmpty) return null;
-    final parts = raw.split(':');
-    if (parts.length < 4 || parts.first != 'dose') return null;
-    try {
-      // ISO 8601 문자열에 ':' 포함. parts[3..end] 모두 합쳐서 파싱.
-      final iso = parts.sublist(3).join(':');
-      return _DosePayload(
-        scheduleId: int.parse(parts[1]),
-        medicationId: int.parse(parts[2]),
-        scheduledAt: DateTime.parse(iso),
-      );
-    } catch (e) {
-      debugPrint('payload parse fail: $raw — $e');
-      return null;
-    }
+/// 알림 payload 문자열 파싱. 잘못된 형식이면 null.
+DosePayload? parseDosePayload(String? raw) {
+  if (raw == null || raw.isEmpty) return null;
+  final parts = raw.split(':');
+  if (parts.length < 4 || parts.first != 'dose') return null;
+  try {
+    // ISO 8601 문자열에 ':' 포함. parts[3..end] 모두 합쳐서 파싱.
+    final iso = parts.sublist(3).join(':');
+    return DosePayload(
+      scheduleId: int.parse(parts[1]),
+      medicationId: int.parse(parts[2]),
+      scheduledAt: DateTime.parse(iso),
+    );
+  } catch (e) {
+    debugPrint('payload parse fail: $raw — $e');
+    return null;
   }
 }
 
@@ -46,7 +48,7 @@ class NotificationActionHandler {
   final ProviderContainer _container;
 
   Future<void> handle(NotificationResponse response) async {
-    final payload = _DosePayload.parse(response.payload);
+    final payload = parseDosePayload(response.payload);
     if (payload == null) {
       debugPrint('skip notification — no/invalid payload');
       return;
@@ -74,8 +76,11 @@ class NotificationActionHandler {
         debugPrint('snooze (TODO 10min one-shot): ${payload.scheduleId}');
         break;
       default:
-        // 액션 없이 알림 본문 탭한 경우 → 앱 열기 (router 진입 처리는 별도).
-        debugPrint('notification tapped (no action): ${response.payload}');
+        // 액션 없이 알림 본문 탭한 경우 → 약 상세로 deep link.
+        final router = globalRouter;
+        if (router != null) {
+          router.push('${AppRoute.drawer}/${payload.medicationId}');
+        }
     }
   }
 }
