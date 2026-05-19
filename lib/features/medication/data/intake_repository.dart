@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables/intake_logs.dart';
 import '../../../core/database/tables/schedules.dart';
+import '../../../core/notifications/medication_notification_manager.dart';
 
 /// 특정 시점의 복용 한 건(스케줄+약+로그를 묶은 도메인).
 ///
@@ -32,9 +33,10 @@ class DoseInstance {
 }
 
 class IntakeRepository {
-  IntakeRepository(this._db);
+  IntakeRepository(this._db, this._notif);
 
   final AppDatabase _db;
+  final MedicationNotificationManager _notif;
 
   /// 특정 날짜(자정 ~ 익일 자정)의 IntakeLog 들을 watch.
   Stream<List<IntakeLog>> watchDay(DateTime date) {
@@ -88,6 +90,9 @@ class IntakeRepository {
         updatedAt: Value(now),
       ));
     }
+
+    // interval 약: 액션 후 큐 보강을 위해 sync 재호출 (daily/weekly는 멱등).
+    await _notif.syncSchedulesFor(medicationId);
   }
 
   Future<void> markTaken({

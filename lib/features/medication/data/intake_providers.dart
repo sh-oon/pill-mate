@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/database/tables/intake_logs.dart';
+import '../../../core/notifications/medication_notification_manager.dart';
 import 'intake_repository.dart';
 import 'medication_providers.dart';
 
 final intakeRepositoryProvider = Provider<IntakeRepository>((ref) {
-  return IntakeRepository(ref.watch(appDatabaseProvider));
+  return IntakeRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(medicationNotificationManagerProvider),
+  );
 });
 
 /// 오늘 IntakeLog 스트림.

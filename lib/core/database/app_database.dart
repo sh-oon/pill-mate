@@ -3,19 +3,20 @@ import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'tables/intake_logs.dart';
+import 'tables/interval_occurrences.dart';
 import 'tables/medications.dart';
 import 'tables/schedules.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Medications, Schedules, IntakeLogs])
+@DriftDatabase(tables: [Medications, Schedules, IntakeLogs, IntervalOccurrences])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -26,6 +27,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 2) {
             // v2: medications.category 컬럼 추가 (nullable text).
             await m.addColumn(medications, medications.category);
+          }
+          if (from < 3) {
+            // v3: interval_occurrences 테이블 신설.
+            await m.createTable(intervalOccurrences);
           }
         },
         beforeOpen: (details) async {
