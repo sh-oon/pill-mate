@@ -33,8 +33,12 @@ class AppRoute {
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
+/// 알림 액션 콜백 등 Riverpod 컨텍스트 밖에서 router에 접근하기 위한 글로벌 참조.
+/// main isolate에서만 set/use. (백그라운드 isolate 안 됨)
+GoRouter? globalRouter;
+
 final appRouterProvider = Provider<GoRouter>((ref) {
-  return GoRouter(
+  final router = GoRouter(
     navigatorKey: _rootKey,
     initialLocation: AppRoute.splash,
     // CNTabBar의 모달/시트 z-order 협조용 옵저버.
@@ -129,4 +133,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       body: Center(child: Text('경로를 찾을 수 없습니다: ${state.uri}')),
     ),
   );
+  globalRouter = router;
+  return router;
 });

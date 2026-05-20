@@ -188,6 +188,7 @@ class MedicationNotificationManager {
       await _plugin.cancel(_weeklyIdFor(s, wd));
     }
     await _plugin.cancel(_preReminderIdFor(s));
+    await _plugin.cancel(_snoozeIdForSched(s.id));
     await _cancelUrgentSlots(s.id, max: 32);
   }
 
@@ -202,6 +203,45 @@ class MedicationNotificationManager {
     }
   }
 
+  /// 한 슬롯에 대해 [delay] 뒤 일회성 스누즈 알림 등록.
+  ///
+  /// daily/weekly 본 알림은 그대로 두고, 스누즈 슬롯(`scheduleId*10+8`)에
+  /// 단발로 추가 등록. 기존 스누즈가 있으면 cancel 후 새로 (마지막 호출만 살아남음).
+  Future<void> scheduleSnooze({
+    required int scheduleId,
+    required int medicationId,
+    required DateTime originalScheduledAt,
+    Duration delay = const Duration(minutes: 10),
+  }) async {
+    await _plugin.cancel(_snoozeIdForSched(scheduleId));
+    final med = await (_db.select(_db.medications)
+          ..where((m) => m.id.equals(medicationId)))
+        .getSingleOrNull();
+    if (med == null || med.archived) return;
+
+    final when = tz.TZDateTime.from(
+      DateTime.now().add(delay),
+      tz.local,
+    );
+
+    await _plugin.zonedSchedule(
+      _snoozeIdForSched(scheduleId),
+      '${med.name} 복용 시간 (다시 알림)',
+      _quantityHint(med),
+      when,
+      _details(NotifTone.onTime),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      // matchDateTimeComponents 생략 → 단 한 번만 발화
+      payload: _payloadRaw(
+        scheduleId: scheduleId,
+        medicationId: medicationId,
+        when: originalScheduledAt,
+      ),
+    );
+  }
+
   // --- ID 규칙 ----------------------------------------------------------
   //
   // daily/weekly/preReminder는 scheduleId * 10 + [0..9] 범위.
@@ -209,6 +249,7 @@ class MedicationNotificationManager {
 
   int _dailyIdFor(Schedule s) => s.id * 10;
   int _weeklyIdFor(Schedule s, int weekday) => s.id * 10 + weekday;
+  int _snoozeIdForSched(int scheduleId) => scheduleId * 10 + 8;
   int _preReminderIdFor(Schedule s) => s.id * 10 + 9;
   int _urgentIdFor(Schedule s, int n) => s.id * 1000 + 100 + n;
   int _urgentIdForSched(int scheduleId, int n) => scheduleId * 1000 + 100 + n;
@@ -311,8 +352,21 @@ class MedicationNotificationManager {
   /// payload: dose:scheduleId:medicationId:isoScheduledAt
   /// 액션 핸들러에서 split(':')로 파싱.
   String _payload(Schedule s, tz.TZDateTime when) {
-    final local = DateTime(when.year, when.month, when.day, when.hour, when.minute);
-    return 'dose:${s.id}:${s.medicationId}:${local.toIso8601String()}';
+    final local = DateTime(
+        when.year, when.month, when.day, when.hour, when.minute);
+    return _payloadRaw(
+      scheduleId: s.id,
+      medicationId: s.medicationId,
+      when: local,
+    );
+  }
+
+  String _payloadRaw({
+    required int scheduleId,
+    required int medicationId,
+    required DateTime when,
+  }) {
+    return 'dose:$scheduleId:$medicationId:${when.toIso8601String()}';
   }
 }
 
