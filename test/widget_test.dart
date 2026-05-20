@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart' show Size;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -15,6 +16,17 @@ ProviderScope _boot(SharedPreferences prefs) {
   );
 }
 
+/// flutter_test 기본 viewport(800×600)는 폰 UI를 가정하는 본 앱과 맞지 않아
+/// onboarding Column이 RenderFlex overflow를 일으킴. iPhone 14 Pro 사이즈로 고정.
+void _usePhoneViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1179, 2556);
+  tester.view.devicePixelRatio = 3.0;
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -27,6 +39,7 @@ void main() {
   });
 
   testWidgets('splash → onboarding (first launch)', (tester) async {
+    _usePhoneViewport(tester);
     final prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(_boot(prefs));
 
@@ -46,6 +59,7 @@ void main() {
 
   testWidgets('splash → home (onboarding already completed)',
       (tester) async {
+    _usePhoneViewport(tester);
     SharedPreferences.setMockInitialValues({
       'pm.onboarding.completed.v1': true,
     });
