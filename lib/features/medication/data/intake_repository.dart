@@ -91,8 +91,10 @@ class IntakeRepository {
       ));
     }
 
-    // 사용자가 액션했으면 같은 슬롯의 urgent 재알림은 더 이상 울리지 않게 모두 취소.
+    // 1) 같은 슬롯의 urgent 재알림 즉시 취소 (사용자 액션 후 추가 발화 막음).
     await _notif.cancelUrgentForSchedule(scheduleId);
+    // 2) interval 약: 액션 후 큐 +1 보강 위해 sync 재호출 (daily/weekly는 멱등).
+    await _notif.syncSchedulesFor(medicationId);
   }
 
   Future<void> markTaken({

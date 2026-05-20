@@ -92,9 +92,7 @@ class MedicationNotificationManager {
         await _scheduleWeekly(med, schedule);
         break;
       case RepeatKind.interval:
-        // N일 간격 반복은 OS 기본 매칭 컴포넌트로 표현 불가.
-        // TODO: 다음 occurrence만 단발 등록 + 사용자 액션 후 재등록 흐름 필요.
-        debugPrint('interval repeat not yet supported (sched=${schedule.id})');
+        await _scheduleInterval(med, schedule);
         break;
     }
   }
@@ -182,14 +180,98 @@ class MedicationNotificationManager {
     }
   }
 
+  /// Interval 약: 향후 [target]개 occurrence를 DB 큐에 채우고 각각 단발 알림 등록.
+  /// 이미 큐에 있는 occurrence는 재사용. 사용자 액션 후 또는 부팅 시 재호출되어
+  /// 큐 길이 유지.
+  Future<void> _scheduleInterval(
+    Medication med,
+    Schedule s, {
+    int target = 7,
+  }) async {
+    final n = s.intervalDays ?? 1;
+    if (n <= 0) return;
+
+    final today = _dateOnly(DateTime.now());
+
+    // 1) 과거 occurrence 정리.
+    await (_db.delete(_db.intervalOccurrences)
+          ..where((o) =>
+              o.scheduleId.equals(s.id) &
+              o.scheduledAt.isSmallerThanValue(today)))
+        .go();
+
+    // 2) 현재 큐 조회.
+    final upcoming = await (_db.select(_db.intervalOccurrences)
+          ..where((o) => o.scheduleId.equals(s.id))
+          ..orderBy([(o) => OrderingTerm.asc(o.scheduledAt)]))
+        .get();
+
+    // 3) 부족분 보강 — startDate 기준 N일 step.
+    DateTime nextDate;
+    if (upcoming.isEmpty) {
+      // 첫 occurrence = today >= startDate인 가장 빠른 N일 단계.
+      nextDate = _dateOnly(s.startDate);
+      while (nextDate.isBefore(today)) {
+        nextDate = nextDate.add(Duration(days: n));
+      }
+    } else {
+      nextDate = _dateOnly(upcoming.last.scheduledAt).add(Duration(days: n));
+    }
+
+    final toAdd = target - upcoming.length;
+    for (var i = 0; i < toAdd; i++) {
+      final at = _combineDateAndTime(nextDate, s.timeOfDay);
+      await _db.into(_db.intervalOccurrences).insert(
+            IntervalOccurrencesCompanion.insert(
+              scheduleId: s.id,
+              scheduledAt: at,
+            ),
+          );
+      nextDate = nextDate.add(Duration(days: n));
+    }
+
+    // 4) DB 큐 전체를 OS 알림으로 (재)등록. 단발이므로 매번 register OK.
+    final all = await (_db.select(_db.intervalOccurrences)
+          ..where((o) => o.scheduleId.equals(s.id))
+          ..orderBy([(o) => OrderingTerm.asc(o.scheduledAt)]))
+        .get();
+    final now = tz.TZDateTime.now(tz.local);
+    for (final occ in all) {
+      final when = tz.TZDateTime.from(occ.scheduledAt, tz.local);
+      if (!when.isAfter(now)) continue;
+      await _plugin.zonedSchedule(
+        _intervalIdForOccurrence(occ.id),
+        '${med.name} 복용 시간',
+        _quantityHint(med),
+        when,
+        _details(NotifTone.onTime),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        // 단발 (matchDateTimeComponents 생략)
+        payload: _payloadAt(s, occ.scheduledAt),
+      );
+    }
+  }
+
   Future<void> _cancelSchedule(Schedule s) async {
     await _plugin.cancel(_dailyIdFor(s));
     for (var wd = 1; wd <= 7; wd++) {
       await _plugin.cancel(_weeklyIdFor(s, wd));
     }
     await _plugin.cancel(_preReminderIdFor(s));
-    await _plugin.cancel(_snoozeIdForSched(s.id));
     await _cancelUrgentSlots(s.id, max: 32);
+    await _plugin.cancel(_snoozeIdForSched(s.id));
+    // Interval occurrences cancel + DB 큐 비우기.
+    final occs = await (_db.select(_db.intervalOccurrences)
+          ..where((o) => o.scheduleId.equals(s.id)))
+        .get();
+    for (final o in occs) {
+      await _plugin.cancel(_intervalIdForOccurrence(o.id));
+    }
+    await (_db.delete(_db.intervalOccurrences)
+          ..where((o) => o.scheduleId.equals(s.id)))
+        .go();
   }
 
   /// 오늘 (또는 미래) 등록된 urgent 단발 알림들을 모두 취소.
@@ -243,9 +325,10 @@ class MedicationNotificationManager {
   }
 
   // --- ID 규칙 ----------------------------------------------------------
-  //
-  // daily/weekly/preReminder는 scheduleId * 10 + [0..9] 범위.
-  // urgent는 scheduleId * 1000 + [101..199] 범위 → 자릿수 분리로 충돌 없음.
+  // daily/weekly/preReminder: scheduleId * 10 + [0..9]
+  //   (pre=9, daily=0, weekly=1..7)
+  // urgent: scheduleId * 1000 + 100 + n  (자릿수 분리)
+  // interval: 100_000_000 + occurrenceId (별도 시퀀스)
 
   int _dailyIdFor(Schedule s) => s.id * 10;
   int _weeklyIdFor(Schedule s, int weekday) => s.id * 10 + weekday;
@@ -253,6 +336,8 @@ class MedicationNotificationManager {
   int _preReminderIdFor(Schedule s) => s.id * 10 + 9;
   int _urgentIdFor(Schedule s, int n) => s.id * 1000 + 100 + n;
   int _urgentIdForSched(int scheduleId, int n) => scheduleId * 1000 + 100 + n;
+  int _intervalIdForOccurrence(int occurrenceId) =>
+      100000000 + occurrenceId;
 
   // --- 시각 계산 ---------------------------------------------------------
 
@@ -361,12 +446,34 @@ class MedicationNotificationManager {
     );
   }
 
+  /// Interval occurrence처럼 임의의 DateTime으로 payload 생성하는 경우.
+  String _payloadAt(Schedule s, DateTime when) {
+    return _payloadRaw(
+      scheduleId: s.id,
+      medicationId: s.medicationId,
+      when: when,
+    );
+  }
+
   String _payloadRaw({
     required int scheduleId,
     required int medicationId,
     required DateTime when,
   }) {
     return 'dose:$scheduleId:$medicationId:${when.toIso8601String()}';
+  }
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  DateTime _combineDateAndTime(DateTime date, String hhmm) {
+    final p = hhmm.split(':');
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      int.parse(p[0]),
+      int.parse(p[1]),
+    );
   }
 }
 

@@ -2189,12 +2189,377 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
   }
 }
 
+class $IntervalOccurrencesTable extends IntervalOccurrences
+    with TableInfo<$IntervalOccurrencesTable, IntervalOccurrence> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $IntervalOccurrencesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _scheduleIdMeta = const VerificationMeta(
+    'scheduleId',
+  );
+  @override
+  late final GeneratedColumn<int> scheduleId = GeneratedColumn<int>(
+    'schedule_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES schedules (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _scheduledAtMeta = const VerificationMeta(
+    'scheduledAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> scheduledAt = GeneratedColumn<DateTime>(
+    'scheduled_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _notifiedMeta = const VerificationMeta(
+    'notified',
+  );
+  @override
+  late final GeneratedColumn<bool> notified = GeneratedColumn<bool>(
+    'notified',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("notified" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    scheduleId,
+    scheduledAt,
+    notified,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'interval_occurrences';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<IntervalOccurrence> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('schedule_id')) {
+      context.handle(
+        _scheduleIdMeta,
+        scheduleId.isAcceptableOrUnknown(data['schedule_id']!, _scheduleIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_scheduleIdMeta);
+    }
+    if (data.containsKey('scheduled_at')) {
+      context.handle(
+        _scheduledAtMeta,
+        scheduledAt.isAcceptableOrUnknown(
+          data['scheduled_at']!,
+          _scheduledAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_scheduledAtMeta);
+    }
+    if (data.containsKey('notified')) {
+      context.handle(
+        _notifiedMeta,
+        notified.isAcceptableOrUnknown(data['notified']!, _notifiedMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  IntervalOccurrence map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return IntervalOccurrence(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      scheduleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}schedule_id'],
+      )!,
+      scheduledAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}scheduled_at'],
+      )!,
+      notified: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}notified'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $IntervalOccurrencesTable createAlias(String alias) {
+    return $IntervalOccurrencesTable(attachedDatabase, alias);
+  }
+}
+
+class IntervalOccurrence extends DataClass
+    implements Insertable<IntervalOccurrence> {
+  final int id;
+  final int scheduleId;
+  final DateTime scheduledAt;
+  final bool notified;
+  final DateTime createdAt;
+  const IntervalOccurrence({
+    required this.id,
+    required this.scheduleId,
+    required this.scheduledAt,
+    required this.notified,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['schedule_id'] = Variable<int>(scheduleId);
+    map['scheduled_at'] = Variable<DateTime>(scheduledAt);
+    map['notified'] = Variable<bool>(notified);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  IntervalOccurrencesCompanion toCompanion(bool nullToAbsent) {
+    return IntervalOccurrencesCompanion(
+      id: Value(id),
+      scheduleId: Value(scheduleId),
+      scheduledAt: Value(scheduledAt),
+      notified: Value(notified),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory IntervalOccurrence.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return IntervalOccurrence(
+      id: serializer.fromJson<int>(json['id']),
+      scheduleId: serializer.fromJson<int>(json['scheduleId']),
+      scheduledAt: serializer.fromJson<DateTime>(json['scheduledAt']),
+      notified: serializer.fromJson<bool>(json['notified']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'scheduleId': serializer.toJson<int>(scheduleId),
+      'scheduledAt': serializer.toJson<DateTime>(scheduledAt),
+      'notified': serializer.toJson<bool>(notified),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  IntervalOccurrence copyWith({
+    int? id,
+    int? scheduleId,
+    DateTime? scheduledAt,
+    bool? notified,
+    DateTime? createdAt,
+  }) => IntervalOccurrence(
+    id: id ?? this.id,
+    scheduleId: scheduleId ?? this.scheduleId,
+    scheduledAt: scheduledAt ?? this.scheduledAt,
+    notified: notified ?? this.notified,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  IntervalOccurrence copyWithCompanion(IntervalOccurrencesCompanion data) {
+    return IntervalOccurrence(
+      id: data.id.present ? data.id.value : this.id,
+      scheduleId: data.scheduleId.present
+          ? data.scheduleId.value
+          : this.scheduleId,
+      scheduledAt: data.scheduledAt.present
+          ? data.scheduledAt.value
+          : this.scheduledAt,
+      notified: data.notified.present ? data.notified.value : this.notified,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IntervalOccurrence(')
+          ..write('id: $id, ')
+          ..write('scheduleId: $scheduleId, ')
+          ..write('scheduledAt: $scheduledAt, ')
+          ..write('notified: $notified, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, scheduleId, scheduledAt, notified, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is IntervalOccurrence &&
+          other.id == this.id &&
+          other.scheduleId == this.scheduleId &&
+          other.scheduledAt == this.scheduledAt &&
+          other.notified == this.notified &&
+          other.createdAt == this.createdAt);
+}
+
+class IntervalOccurrencesCompanion extends UpdateCompanion<IntervalOccurrence> {
+  final Value<int> id;
+  final Value<int> scheduleId;
+  final Value<DateTime> scheduledAt;
+  final Value<bool> notified;
+  final Value<DateTime> createdAt;
+  const IntervalOccurrencesCompanion({
+    this.id = const Value.absent(),
+    this.scheduleId = const Value.absent(),
+    this.scheduledAt = const Value.absent(),
+    this.notified = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  IntervalOccurrencesCompanion.insert({
+    this.id = const Value.absent(),
+    required int scheduleId,
+    required DateTime scheduledAt,
+    this.notified = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  }) : scheduleId = Value(scheduleId),
+       scheduledAt = Value(scheduledAt);
+  static Insertable<IntervalOccurrence> custom({
+    Expression<int>? id,
+    Expression<int>? scheduleId,
+    Expression<DateTime>? scheduledAt,
+    Expression<bool>? notified,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (scheduleId != null) 'schedule_id': scheduleId,
+      if (scheduledAt != null) 'scheduled_at': scheduledAt,
+      if (notified != null) 'notified': notified,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  IntervalOccurrencesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? scheduleId,
+    Value<DateTime>? scheduledAt,
+    Value<bool>? notified,
+    Value<DateTime>? createdAt,
+  }) {
+    return IntervalOccurrencesCompanion(
+      id: id ?? this.id,
+      scheduleId: scheduleId ?? this.scheduleId,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
+      notified: notified ?? this.notified,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (scheduleId.present) {
+      map['schedule_id'] = Variable<int>(scheduleId.value);
+    }
+    if (scheduledAt.present) {
+      map['scheduled_at'] = Variable<DateTime>(scheduledAt.value);
+    }
+    if (notified.present) {
+      map['notified'] = Variable<bool>(notified.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IntervalOccurrencesCompanion(')
+          ..write('id: $id, ')
+          ..write('scheduleId: $scheduleId, ')
+          ..write('scheduledAt: $scheduledAt, ')
+          ..write('notified: $notified, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $MedicationsTable medications = $MedicationsTable(this);
   late final $SchedulesTable schedules = $SchedulesTable(this);
   late final $IntakeLogsTable intakeLogs = $IntakeLogsTable(this);
+  late final $IntervalOccurrencesTable intervalOccurrences =
+      $IntervalOccurrencesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2203,6 +2568,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     medications,
     schedules,
     intakeLogs,
+    intervalOccurrences,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -2226,6 +2592,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('intake_logs', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'schedules',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('interval_occurrences', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -2834,6 +3207,33 @@ final class $$SchedulesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<
+    $IntervalOccurrencesTable,
+    List<IntervalOccurrence>
+  >
+  _intervalOccurrencesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.intervalOccurrences,
+        aliasName: $_aliasNameGenerator(
+          db.schedules.id,
+          db.intervalOccurrences.scheduleId,
+        ),
+      );
+
+  $$IntervalOccurrencesTableProcessedTableManager get intervalOccurrencesRefs {
+    final manager = $$IntervalOccurrencesTableTableManager(
+      $_db,
+      $_db.intervalOccurrences,
+    ).filter((f) => f.scheduleId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _intervalOccurrencesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$SchedulesTableFilterComposer
@@ -2950,6 +3350,31 @@ class $$SchedulesTableFilterComposer
           }) => $$IntakeLogsTableFilterComposer(
             $db: $db,
             $table: $db.intakeLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> intervalOccurrencesRefs(
+    Expression<bool> Function($$IntervalOccurrencesTableFilterComposer f) f,
+  ) {
+    final $$IntervalOccurrencesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.intervalOccurrences,
+      getReferencedColumn: (t) => t.scheduleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$IntervalOccurrencesTableFilterComposer(
+            $db: $db,
+            $table: $db.intervalOccurrences,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -3166,6 +3591,32 @@ class $$SchedulesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> intervalOccurrencesRefs<T extends Object>(
+    Expression<T> Function($$IntervalOccurrencesTableAnnotationComposer a) f,
+  ) {
+    final $$IntervalOccurrencesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.intervalOccurrences,
+          getReferencedColumn: (t) => t.scheduleId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$IntervalOccurrencesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.intervalOccurrences,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$SchedulesTableTableManager
@@ -3181,7 +3632,11 @@ class $$SchedulesTableTableManager
           $$SchedulesTableUpdateCompanionBuilder,
           (Schedule, $$SchedulesTableReferences),
           Schedule,
-          PrefetchHooks Function({bool medicationId, bool intakeLogsRefs})
+          PrefetchHooks Function({
+            bool medicationId,
+            bool intakeLogsRefs,
+            bool intervalOccurrencesRefs,
+          })
         > {
   $$SchedulesTableTableManager(_$AppDatabase db, $SchedulesTable table)
     : super(
@@ -3267,10 +3722,17 @@ class $$SchedulesTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({medicationId = false, intakeLogsRefs = false}) {
+              ({
+                medicationId = false,
+                intakeLogsRefs = false,
+                intervalOccurrencesRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
-                  explicitlyWatchedTables: [if (intakeLogsRefs) db.intakeLogs],
+                  explicitlyWatchedTables: [
+                    if (intakeLogsRefs) db.intakeLogs,
+                    if (intervalOccurrencesRefs) db.intervalOccurrences,
+                  ],
                   addJoins:
                       <
                         T extends TableManagerState<
@@ -3326,6 +3788,27 @@ class $$SchedulesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (intervalOccurrencesRefs)
+                        await $_getPrefetchedData<
+                          Schedule,
+                          $SchedulesTable,
+                          IntervalOccurrence
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SchedulesTableReferences
+                              ._intervalOccurrencesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$SchedulesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).intervalOccurrencesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.scheduleId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -3346,7 +3829,11 @@ typedef $$SchedulesTableProcessedTableManager =
       $$SchedulesTableUpdateCompanionBuilder,
       (Schedule, $$SchedulesTableReferences),
       Schedule,
-      PrefetchHooks Function({bool medicationId, bool intakeLogsRefs})
+      PrefetchHooks Function({
+        bool medicationId,
+        bool intakeLogsRefs,
+        bool intervalOccurrencesRefs,
+      })
     >;
 typedef $$IntakeLogsTableCreateCompanionBuilder =
     IntakeLogsCompanion Function({
@@ -3849,6 +4336,343 @@ typedef $$IntakeLogsTableProcessedTableManager =
       IntakeLog,
       PrefetchHooks Function({bool medicationId, bool scheduleId})
     >;
+typedef $$IntervalOccurrencesTableCreateCompanionBuilder =
+    IntervalOccurrencesCompanion Function({
+      Value<int> id,
+      required int scheduleId,
+      required DateTime scheduledAt,
+      Value<bool> notified,
+      Value<DateTime> createdAt,
+    });
+typedef $$IntervalOccurrencesTableUpdateCompanionBuilder =
+    IntervalOccurrencesCompanion Function({
+      Value<int> id,
+      Value<int> scheduleId,
+      Value<DateTime> scheduledAt,
+      Value<bool> notified,
+      Value<DateTime> createdAt,
+    });
+
+final class $$IntervalOccurrencesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $IntervalOccurrencesTable,
+          IntervalOccurrence
+        > {
+  $$IntervalOccurrencesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $SchedulesTable _scheduleIdTable(_$AppDatabase db) =>
+      db.schedules.createAlias(
+        $_aliasNameGenerator(
+          db.intervalOccurrences.scheduleId,
+          db.schedules.id,
+        ),
+      );
+
+  $$SchedulesTableProcessedTableManager get scheduleId {
+    final $_column = $_itemColumn<int>('schedule_id')!;
+
+    final manager = $$SchedulesTableTableManager(
+      $_db,
+      $_db.schedules,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_scheduleIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$IntervalOccurrencesTableFilterComposer
+    extends Composer<_$AppDatabase, $IntervalOccurrencesTable> {
+  $$IntervalOccurrencesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get notified => $composableBuilder(
+    column: $table.notified,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$SchedulesTableFilterComposer get scheduleId {
+    final $$SchedulesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.scheduleId,
+      referencedTable: $db.schedules,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SchedulesTableFilterComposer(
+            $db: $db,
+            $table: $db.schedules,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$IntervalOccurrencesTableOrderingComposer
+    extends Composer<_$AppDatabase, $IntervalOccurrencesTable> {
+  $$IntervalOccurrencesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get notified => $composableBuilder(
+    column: $table.notified,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$SchedulesTableOrderingComposer get scheduleId {
+    final $$SchedulesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.scheduleId,
+      referencedTable: $db.schedules,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SchedulesTableOrderingComposer(
+            $db: $db,
+            $table: $db.schedules,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$IntervalOccurrencesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $IntervalOccurrencesTable> {
+  $$IntervalOccurrencesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get notified =>
+      $composableBuilder(column: $table.notified, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$SchedulesTableAnnotationComposer get scheduleId {
+    final $$SchedulesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.scheduleId,
+      referencedTable: $db.schedules,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SchedulesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.schedules,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$IntervalOccurrencesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $IntervalOccurrencesTable,
+          IntervalOccurrence,
+          $$IntervalOccurrencesTableFilterComposer,
+          $$IntervalOccurrencesTableOrderingComposer,
+          $$IntervalOccurrencesTableAnnotationComposer,
+          $$IntervalOccurrencesTableCreateCompanionBuilder,
+          $$IntervalOccurrencesTableUpdateCompanionBuilder,
+          (IntervalOccurrence, $$IntervalOccurrencesTableReferences),
+          IntervalOccurrence,
+          PrefetchHooks Function({bool scheduleId})
+        > {
+  $$IntervalOccurrencesTableTableManager(
+    _$AppDatabase db,
+    $IntervalOccurrencesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$IntervalOccurrencesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$IntervalOccurrencesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$IntervalOccurrencesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> scheduleId = const Value.absent(),
+                Value<DateTime> scheduledAt = const Value.absent(),
+                Value<bool> notified = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => IntervalOccurrencesCompanion(
+                id: id,
+                scheduleId: scheduleId,
+                scheduledAt: scheduledAt,
+                notified: notified,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int scheduleId,
+                required DateTime scheduledAt,
+                Value<bool> notified = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => IntervalOccurrencesCompanion.insert(
+                id: id,
+                scheduleId: scheduleId,
+                scheduledAt: scheduledAt,
+                notified: notified,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$IntervalOccurrencesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({scheduleId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (scheduleId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.scheduleId,
+                                referencedTable:
+                                    $$IntervalOccurrencesTableReferences
+                                        ._scheduleIdTable(db),
+                                referencedColumn:
+                                    $$IntervalOccurrencesTableReferences
+                                        ._scheduleIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$IntervalOccurrencesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $IntervalOccurrencesTable,
+      IntervalOccurrence,
+      $$IntervalOccurrencesTableFilterComposer,
+      $$IntervalOccurrencesTableOrderingComposer,
+      $$IntervalOccurrencesTableAnnotationComposer,
+      $$IntervalOccurrencesTableCreateCompanionBuilder,
+      $$IntervalOccurrencesTableUpdateCompanionBuilder,
+      (IntervalOccurrence, $$IntervalOccurrencesTableReferences),
+      IntervalOccurrence,
+      PrefetchHooks Function({bool scheduleId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -3859,4 +4683,6 @@ class $AppDatabaseManager {
       $$SchedulesTableTableManager(_db, _db.schedules);
   $$IntakeLogsTableTableManager get intakeLogs =>
       $$IntakeLogsTableTableManager(_db, _db.intakeLogs);
+  $$IntervalOccurrencesTableTableManager get intervalOccurrences =>
+      $$IntervalOccurrencesTableTableManager(_db, _db.intervalOccurrences);
 }
