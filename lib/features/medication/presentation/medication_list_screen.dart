@@ -26,6 +26,7 @@ class MedicationListScreen extends ConsumerStatefulWidget {
 
 class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
   _CategoryFilter _filter = _CategoryFilter.all;
+  _MedicationSort _sort = _MedicationSort.name;
 
   bool _matchesFilter(MedicationWithSchedules m) {
     final cat = m.medication.category;
@@ -34,6 +35,46 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
       _CategoryFilter.sup => cat == 'sup',
       _CategoryFilter.med => cat == 'med',
     };
+  }
+
+  Future<void> _pickSort() async {
+    final picked = await showModalBottomSheet<_MedicationSort>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: RadioGroup<_MedicationSort>(
+          groupValue: _sort,
+          onChanged: (v) => Navigator.of(ctx).pop(v),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(22, 18, 22, 6),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '정렬',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textStrong,
+                    ),
+                  ),
+                ),
+              ),
+              for (final s in _MedicationSort.values)
+                RadioListTile<_MedicationSort>(
+                  value: s,
+                  title: Text(s.label),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked != null && picked != _sort) {
+      setState(() => _sort = picked);
+    }
   }
 
   @override
@@ -57,7 +98,8 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
             const Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
         error: (e, _) => _ErrorState(error: e),
         data: (all) {
-          final filtered = all.where(_matchesFilter).toList();
+          final filtered = all.where(_matchesFilter).toList()
+            ..sort(_sort.comparator);
           return ListView(
             padding: const EdgeInsets.only(top: 8, bottom: 140),
             children: [
@@ -68,6 +110,8 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
               _FilterRow(
                 filter: _filter,
                 onChange: (f) => setState(() => _filter = f),
+                sortLabel: _sort.label,
+                onSortTap: _pickSort,
               ),
               if (all.isEmpty)
                 const _EmptyState()
@@ -123,10 +167,17 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
 enum _CategoryFilter { all, sup, med }
 
 class _FilterRow extends StatelessWidget {
-  const _FilterRow({required this.filter, required this.onChange});
+  const _FilterRow({
+    required this.filter,
+    required this.onChange,
+    required this.sortLabel,
+    required this.onSortTap,
+  });
 
   final _CategoryFilter filter;
   final ValueChanged<_CategoryFilter> onChange;
+  final String sortLabel;
+  final VoidCallback onSortTap;
 
   @override
   Widget build(BuildContext context) {
@@ -152,7 +203,7 @@ class _FilterRow extends StatelessWidget {
             onTap: () => onChange(_CategoryFilter.med),
           ),
           const Spacer(),
-          const _SortChip(),
+          _SortChip(label: sortLabel, onTap: onSortTap),
         ],
       ),
     );
@@ -160,28 +211,92 @@ class _FilterRow extends StatelessWidget {
 }
 
 class _SortChip extends StatelessWidget {
-  const _SortChip();
+  const _SortChip({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             Text(
-              '이름순',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              label,
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
             ),
-            Icon(Icons.expand_more, size: 14, color: AppColors.textMuted),
+            const Icon(Icons.expand_more,
+                size: 14, color: AppColors.textMuted),
           ],
         ),
       ),
     );
   }
+}
+
+// ============================================================
+// 정렬 옵션
+// ============================================================
+
+enum _MedicationSort { name, recent, nextDose }
+
+extension on _MedicationSort {
+  String get label => switch (this) {
+        _MedicationSort.name => '이름순',
+        _MedicationSort.recent => '최근 등록순',
+        _MedicationSort.nextDose => '다음 복용순',
+      };
+
+  int Function(MedicationWithSchedules, MedicationWithSchedules) get comparator =>
+      switch (this) {
+        _MedicationSort.name => _byName,
+        _MedicationSort.recent => _byRecent,
+        _MedicationSort.nextDose => _byNextDose,
+      };
+}
+
+int _byName(MedicationWithSchedules a, MedicationWithSchedules b) =>
+    a.medication.name.toLowerCase().compareTo(b.medication.name.toLowerCase());
+
+int _byRecent(MedicationWithSchedules a, MedicationWithSchedules b) =>
+    b.medication.createdAt.compareTo(a.medication.createdAt);
+
+/// PRN(스케줄 없음)은 항상 마지막. 그 외엔 가장 가까운 미래 복용시각 오름차순.
+int _byNextDose(MedicationWithSchedules a, MedicationWithSchedules b) {
+  final na = _nextDoseAt(a);
+  final nb = _nextDoseAt(b);
+  if (na == null && nb == null) return _byName(a, b);
+  if (na == null) return 1;
+  if (nb == null) return -1;
+  final c = na.compareTo(nb);
+  return c != 0 ? c : _byName(a, b);
+}
+
+/// 약의 가장 가까운 미래 복용 시각 (오늘 남은 슬롯 있으면 오늘, 아니면 내일 첫
+/// 슬롯). PRN(스케줄 없음)이면 null.
+DateTime? _nextDoseAt(MedicationWithSchedules m) {
+  if (m.schedules.isEmpty) return null;
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final mins = now.hour * 60 + now.minute;
+  final times = [...m.times]..sort();
+  for (final t in times) {
+    final parts = t.split(':');
+    final tm = int.parse(parts[0]) * 60 + int.parse(parts[1]);
+    if (tm > mins) {
+      return today.add(Duration(minutes: tm));
+    }
+  }
+  final first = times.first.split(':');
+  return today.add(Duration(
+    days: 1,
+    minutes: int.parse(first[0]) * 60 + int.parse(first[1]),
+  ));
 }
 
 // ============================================================
