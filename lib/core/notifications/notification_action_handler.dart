@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/medication/data/intake_providers.dart';
 import 'background_actions.dart';
+import 'medication_notification_manager.dart';
 import 'notification_channels.dart';
 
 /// 알림 payload 파싱 결과 — `dose:scheduleId:medicationId:isoScheduledAt`.
@@ -74,8 +75,13 @@ class NotificationActionHandler {
         );
         break;
       case NotificationChannels.actionSnooze:
-        // TODO: 10분 뒤 일회성 알림 등록 — 별도 헬퍼 필요.
-        debugPrint('snooze (TODO 10min one-shot): ${payload.scheduleId}');
+        await _container
+            .read(medicationNotificationManagerProvider)
+            .scheduleSnooze(
+              scheduleId: payload.scheduleId,
+              medicationId: payload.medicationId,
+              originalScheduledAt: payload.scheduledAt,
+            );
         break;
       default:
         // 액션 없이 알림 본문 탭한 경우 → 앱 열기 (router 진입 처리는 별도).
