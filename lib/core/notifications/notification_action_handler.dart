@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/medication/data/intake_providers.dart';
+import '../router/app_router.dart';
 import 'background_actions.dart';
 import 'medication_notification_manager.dart';
 import 'notification_channels.dart';
@@ -84,8 +85,11 @@ class NotificationActionHandler {
             );
         break;
       default:
-        // 액션 없이 알림 본문 탭한 경우 → 앱 열기 (router 진입 처리는 별도).
-        debugPrint('notification tapped (no action): ${response.payload}');
+        // 액션 없이 알림 본문 탭한 경우 → 약 상세로 deep link.
+        final router = globalRouter;
+        if (router != null) {
+          router.push('${AppRoute.drawer}/${payload.medicationId}');
+        }
     }
   }
 }
