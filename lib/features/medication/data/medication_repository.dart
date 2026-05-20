@@ -23,6 +23,10 @@ class MedicationWithSchedules {
   /// 첫 스케줄 기준 repeat (모든 스케줄이 동일하다는 전제).
   RepeatKind get repeatKind =>
       schedules.isEmpty ? RepeatKind.daily : schedules.first.repeatKind;
+
+  /// 첫 스케줄 기준 사전 알림 분 (모든 스케줄이 동일하다는 전제). null이면 OFF.
+  int? get remindBeforeMinutes =>
+      schedules.isEmpty ? null : schedules.first.remindBeforeMinutes;
 }
 
 /// 신규/수정 시 입력 폼.
@@ -37,6 +41,7 @@ class MedicationDraft {
     this.daysOfWeekMask,
     this.intervalDays,
     this.memo,
+    this.remindBeforeMinutes,
   });
 
   final String name;
@@ -52,6 +57,10 @@ class MedicationDraft {
   final int? daysOfWeekMask;
   final int? intervalDays;
   final String? memo;
+
+  /// 본 알림 N분 전 사전 알림. null/0이면 OFF.
+  /// 약 1개 = 모든 스케줄에 동일 적용.
+  final int? remindBeforeMinutes;
 }
 
 class MedicationRepository {
@@ -151,6 +160,7 @@ class MedicationRepository {
                 repeatKind: Value(draft.repeatKind),
                 daysOfWeekMask: Value(draft.daysOfWeekMask),
                 intervalDays: Value(draft.intervalDays),
+                remindBeforeMinutes: Value(draft.remindBeforeMinutes),
               ),
             );
       }
@@ -186,6 +196,7 @@ class MedicationRepository {
                 repeatKind: Value(draft.repeatKind),
                 daysOfWeekMask: Value(draft.daysOfWeekMask),
                 intervalDays: Value(draft.intervalDays),
+                remindBeforeMinutes: Value(draft.remindBeforeMinutes),
               ),
             );
       }

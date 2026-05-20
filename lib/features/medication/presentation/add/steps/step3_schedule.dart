@@ -4,7 +4,11 @@ import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/widgets/filter_pill.dart';
 import '../widgets/time_slot_row.dart';
 
-/// Step 3: 반복 + 알림 시각 입력.
+/// 사용자가 고를 수 있는 "본 알림 N분 전" 사전 알림 옵션 (분).
+/// null이면 사전 알림 OFF.
+const kPreReminderOptions = <int?>[null, 5, 10, 15, 30];
+
+/// Step 3: 반복 + 알림 시각 + 사전 알림 입력.
 class Step3Schedule extends StatelessWidget {
   const Step3Schedule({
     super.key,
@@ -13,6 +17,8 @@ class Step3Schedule extends StatelessWidget {
     required this.times,
     required this.onRemoveTime,
     required this.onAddTime,
+    required this.remindBeforeMinutes,
+    required this.onChangeRemindBeforeMinutes,
   });
 
   final String repeat; // 'daily' | 'weekly' | 'interval'
@@ -20,6 +26,10 @@ class Step3Schedule extends StatelessWidget {
   final List<String> times;
   final ValueChanged<int> onRemoveTime;
   final VoidCallback onAddTime;
+
+  /// null = 사전 알림 OFF, 그 외엔 본 알림 N분 전.
+  final int? remindBeforeMinutes;
+  final ValueChanged<int?> onChangeRemindBeforeMinutes;
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +88,36 @@ class Step3Schedule extends StatelessWidget {
                 ),
               if (times.length < 8)
                 AddTimeDashedButton(onPressed: onAddTime),
+              const SizedBox(height: 22),
+              const Text(
+                '사전 알림',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '본 알림 전에 미리 알려드려요',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textFaint,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final m in kPreReminderOptions)
+                    FilterPill(
+                      label: m == null ? '안 함' : '$m분 전',
+                      selected: remindBeforeMinutes == m,
+                      onTap: () => onChangeRemindBeforeMinutes(m),
+                    ),
+                ],
+              ),
             ],
           ),
         ),
