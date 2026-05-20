@@ -32,6 +32,7 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
   String _name = '';
   String _repeat = 'daily';
   final List<String> _times = ['08:00'];
+  int? _remindBeforeMinutes; // null = 사전 알림 OFF
   bool _saving = false;
 
   bool get _isEdit => widget.medicationId != null;
@@ -59,6 +60,8 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
         RepeatKind.weekly => 'weekly',
         RepeatKind.interval => 'interval',
       };
+      final rem = m.remindBeforeMinutes;
+      _remindBeforeMinutes = (rem == null || rem <= 0) ? null : rem;
     });
   }
 
@@ -91,6 +94,7 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
         'interval' => RepeatKind.interval,
         _ => RepeatKind.daily,
       },
+      remindBeforeMinutes: _remindBeforeMinutes,
     );
     try {
       if (_isEdit) {
@@ -179,6 +183,9 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
           onChangeRepeat: (r) => setState(() => _repeat = r),
           times: _times,
           onRemoveTime: (i) => setState(() => _times.removeAt(i)),
+          remindBeforeMinutes: _remindBeforeMinutes,
+          onChangeRemindBeforeMinutes: (m) =>
+              setState(() => _remindBeforeMinutes = m),
           onAddTime: () async {
             final picked = await showTimePicker(
               context: context,
