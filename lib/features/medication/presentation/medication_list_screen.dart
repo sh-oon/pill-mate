@@ -26,8 +26,16 @@ class MedicationListScreen extends ConsumerStatefulWidget {
 
 class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
   _CategoryFilter _filter = _CategoryFilter.all;
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
 
-  bool _matchesFilter(MedicationWithSchedules m) {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  bool _matchesCategory(MedicationWithSchedules m) {
     final cat = m.medication.category;
     return switch (_filter) {
       _CategoryFilter.all => true,
@@ -35,6 +43,18 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
       _CategoryFilter.med => cat == 'med',
     };
   }
+
+  /// 검색어 substring 매칭 — 약 이름 + 메모 (대소문자 무시).
+  bool _matchesQuery(MedicationWithSchedules m) {
+    if (_query.isEmpty) return true;
+    final q = _query.toLowerCase();
+    final name = m.medication.name.toLowerCase();
+    final memo = m.medication.memo?.toLowerCase() ?? '';
+    return name.contains(q) || memo.contains(q);
+  }
+
+  bool _matches(MedicationWithSchedules m) =>
+      _matchesCategory(m) && _matchesQuery(m);
 
   @override
   Widget build(BuildContext context) {
@@ -57,13 +77,17 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
             const Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
         error: (e, _) => _ErrorState(error: e),
         data: (all) {
-          final filtered = all.where(_matchesFilter).toList();
+          final filtered = all.where(_matches).toList();
           return ListView(
             padding: const EdgeInsets.only(top: 8, bottom: 140),
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(22, 4, 22, 14),
-                child: SearchInputBar(hintText: '약 이름 또는 성분명 검색'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 4, 22, 14),
+                child: SearchInputBar(
+                  hintText: '약 이름 또는 메모 검색',
+                  controller: _searchController,
+                  onChanged: (v) => setState(() => _query = v.trim()),
+                ),
               ),
               _FilterRow(
                 filter: _filter,
@@ -72,7 +96,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
               if (all.isEmpty)
                 const _EmptyState()
               else if (filtered.isEmpty)
-                const _EmptyFiltered()
+                _EmptyFiltered(query: _query.isNotEmpty ? _query : null)
               else
                 for (final m in filtered)
                   _SwipeToDelete(
@@ -526,16 +550,24 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _EmptyFiltered extends StatelessWidget {
-  const _EmptyFiltered();
+  const _EmptyFiltered({this.query});
+
+  /// 검색 결과가 비어있을 때 사용자가 입력한 키워드. null이면 카테고리 필터
+  /// 단독으로 결과가 비어있다는 의미.
+  final String? query;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(22, 48, 22, 0),
+    final text = query != null
+        ? '"$query"와(과) 일치하는 약이 없어요'
+        : '필터 조건과 일치하는 항목이 없어요';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 48, 22, 0),
       child: Center(
         child: Text(
-          '필터 조건과 일치하는 항목이 없어요',
-          style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
         ),
       ),
     );
