@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_top_bar.dart';
 import '../../../core/widgets/sheets/bundle_notification_sheet.dart';
+import '../../medication/data/calendar_providers.dart';
 import '../../medication/data/reports_providers.dart';
 import 'widgets/metric_card_list.dart';
 import 'widgets/period_tabs.dart';
@@ -21,6 +24,26 @@ class ReportsScreen extends ConsumerStatefulWidget {
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   ReportPeriod _period = ReportPeriod.weekly;
 
+  /// 막대 차트 상세보기 — 캘린더 탭으로 이동하면서 가장 관련된 날짜를 선택.
+  /// 우선순위: 오늘 → 가장 최근 위험(완료율<60%) 일자 → 첫 일자.
+  void _openCalendarForBars(List<DailyPercent> list) {
+    if (list.isEmpty) {
+      context.go(AppRoute.calendar);
+      return;
+    }
+    final today = list.firstWhere(
+      (p) => p.isToday,
+      orElse: () => list.first,
+    );
+    final risk = list.lastWhere(
+      (p) => p.percent < 60,
+      orElse: () => today,
+    );
+    final target = today.isToday ? today : risk;
+    ref.read(calendarJumpDateProvider.notifier).set(target.date);
+    context.go(AppRoute.calendar);
+  }
+
   @override
   Widget build(BuildContext context) {
     final summaryAsync = ref.watch(weeklySummaryProvider);
@@ -28,6 +51,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final streakAsync = ref.watch(streakProvider);
     final bestTimeAsync = ref.watch(bestTimeOfDayProvider);
     final totalAsync = ref.watch(weeklyTotalCompletedProvider);
+    final deltaAsync = ref.watch(weekDeltaPercentProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -42,6 +66,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 time: '',
                 meds: const [],
               ),
+              onSettingsTap: () => context.push(AppRoute.settings),
             ),
             PeriodTabs(
               value: _period,
@@ -56,7 +81,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 progress: s.progress,
                 done: s.done,
                 total: s.total,
-                deltaPercent: 0, // 이전 주 비교는 추후 구현
+                deltaPercent: deltaAsync.value,
               ),
             ),
             summaryAsync.when(
@@ -147,7 +172,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       isRisk: p.percent < 60,
                     ),
                 ],
-                onDetailTap: () {},
+                onDetailTap: () => _openCalendarForBars(list),
               ),
             ),
           ],

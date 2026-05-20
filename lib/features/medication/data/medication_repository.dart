@@ -61,41 +61,58 @@ class MedicationRepository {
   final MedicationNotificationManager _notif;
 
   /// 활성(미아카이브) 약 전체 + 스케줄을 실시간 스트림으로.
+  ///
+  /// join을 써서 watch가 medications + schedules 두 테이블 모두 추적.
+  /// (단일 테이블 watch는 schedule만 바뀐 경우 누락 가능)
   Stream<List<MedicationWithSchedules>> watchAll() {
-    final query = (_db.select(_db.medications)
-          ..where((m) => m.archived.equals(false))
-          ..orderBy([(m) => OrderingTerm.asc(m.name)]))
-        .watch();
+    final query = _db.select(_db.medications).join([
+      leftOuterJoin(
+        _db.schedules,
+        _db.schedules.medicationId.equalsExp(_db.medications.id) &
+            _db.schedules.enabled.equals(true),
+      ),
+    ])
+      ..where(_db.medications.archived.equals(false))
+      ..orderBy([OrderingTerm(expression: _db.medications.name)]);
 
-    return query.asyncMap((meds) async {
-      if (meds.isEmpty) return const <MedicationWithSchedules>[];
-      final ids = meds.map((m) => m.id).toList();
-      final scheds = await (_db.select(_db.schedules)
-            ..where((s) => s.medicationId.isIn(ids) & s.enabled.equals(true)))
-          .get();
-      final byMedId = <int, List<Schedule>>{};
-      for (final s in scheds) {
-        (byMedId[s.medicationId] ??= []).add(s);
+    return query.watch().map((rows) {
+      final medsById = <int, Medication>{};
+      final schedsById = <int, List<Schedule>>{};
+      for (final row in rows) {
+        final med = row.readTable(_db.medications);
+        medsById.putIfAbsent(med.id, () => med);
+        final sched = row.readTableOrNull(_db.schedules);
+        if (sched != null) {
+          (schedsById[med.id] ??= []).add(sched);
+        }
       }
       return [
-        for (final m in meds)
+        for (final m in medsById.values)
           MedicationWithSchedules(
             medication: m,
-            schedules: byMedId[m.id] ?? const [],
+            schedules: schedsById[m.id] ?? const [],
           ),
       ];
     });
   }
 
+  /// 단일 약 + 스케줄 스트림. join으로 두 테이블 추적.
   Stream<MedicationWithSchedules?> watchById(int id) {
-    final medStream = (_db.select(_db.medications)
-          ..where((m) => m.id.equals(id)))
-        .watchSingleOrNull();
-    return medStream.asyncMap((med) async {
-      if (med == null) return null;
-      final scheds = await (_db.select(_db.schedules)
-            ..where((s) => s.medicationId.equals(id)))
-          .get();
+    final query = _db.select(_db.medications).join([
+      leftOuterJoin(
+        _db.schedules,
+        _db.schedules.medicationId.equalsExp(_db.medications.id),
+      ),
+    ])..where(_db.medications.id.equals(id));
+
+    return query.watch().map((rows) {
+      if (rows.isEmpty) return null;
+      final med = rows.first.readTable(_db.medications);
+      final scheds = <Schedule>[
+        for (final r in rows)
+          if (r.readTableOrNull(_db.schedules) != null)
+            r.readTable(_db.schedules),
+      ];
       return MedicationWithSchedules(medication: med, schedules: scheds);
     });
   }

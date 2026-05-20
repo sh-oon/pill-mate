@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/database/tables/schedules.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_buttons.dart';
+import '../../data/intake_providers.dart';
 import '../../data/medication_providers.dart';
 import '../../data/medication_repository.dart';
 import 'steps/step1_category.dart';
@@ -96,6 +97,13 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
         await repo.updateWithSchedules(widget.medicationId!, draft);
       } else {
         await repo.insertWithSchedules(draft);
+      }
+      // 명시적 invalidate — stream re-emit이 timing 이슈로 누락되거나
+      // 늦게 도착할 때 UI가 stale 데이터를 보여주는 케이스 방어.
+      ref.invalidate(todayLogsProvider);
+      ref.invalidate(medicationsStreamProvider);
+      if (_isEdit) {
+        ref.invalidate(medicationByIdProvider(widget.medicationId!));
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

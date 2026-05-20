@@ -20,7 +20,7 @@ class WeekSummaryCard extends StatelessWidget {
   final double progress; // 0~1
   final int done;
   final int total;
-  final int deltaPercent; // +5, -3 등
+  final int? deltaPercent; // 지난 주 대비 %p. null이면 비교 데이터 없음.
 
   @override
   Widget build(BuildContext context) {
@@ -73,15 +73,20 @@ class WeekSummaryCard extends StatelessWidget {
                   ),
                 ),
                 const TextSpan(text: '했어요\n'),
-                TextSpan(
-                  text:
-                      '지난 주보다 ${deltaPercent >= 0 ? '+' : ''}$deltaPercent% ${deltaPercent >= 0 ? '상승' : '하락'}했어요',
-                ),
+                TextSpan(text: _deltaLine(deltaPercent)),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  static String _deltaLine(int? d) {
+    if (d == null) return '지난 주 데이터가 없어요';
+    if (d == 0) return '지난 주와 동일해요';
+    final sign = d > 0 ? '+' : '';
+    final verb = d > 0 ? '상승' : '하락';
+    return '지난 주보다 $sign$d%p $verb했어요';
   }
 }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/database/tables/intake_logs.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_top_bar.dart';
 import '../../../core/widgets/category_chip.dart';
@@ -26,7 +28,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   late DateTime _selectedDate;
   late int _viewYear;
   late int _viewMonth;
-  _DayFilter _filter = _DayFilter.all;
 
   @override
   void initState() {
@@ -97,6 +98,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<DateTime?>(calendarJumpDateProvider, (_, next) {
+      if (next == null) return;
+      setState(() {
+        _selectedDate = DateTime(next.year, next.month, next.day);
+        _viewYear = next.year;
+        _viewMonth = next.month;
+      });
+      // 한 번 소비 후 즉시 초기화 — 다음 진입 시 사용자가 보던 날짜를 유지.
+      Future.microtask(
+        () => ref.read(calendarJumpDateProvider.notifier).set(null),
+      );
+    });
+
     final marksAsync = ref.watch(
       monthMarksProvider((year: _viewYear, month: _viewMonth)),
     );
@@ -110,9 +124,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       IntakeStatus.missed:
           records.where((r) => r.status == IntakeStatus.missed).length,
     };
-    final filtered = _filter == _DayFilter.all
+    final filter = ref.watch(calendarFilterProvider);
+    final filterCtl = ref.read(calendarFilterProvider.notifier);
+    final filtered = filter == DayFilter.all
         ? records
-        : records.where((r) => r.status == _filter.toStatus()).toList();
+        : records.where((r) => r.status == filter.toStatus()).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -127,6 +143,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 time: '',
                 meds: const [],
               ),
+              onSettingsTap: () => context.push(AppRoute.settings),
             ),
             MonthGrid(
               title: '$_viewYear년 $_viewMonth월',
@@ -158,8 +175,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               ),
             ),
             _DayFilterRow(
-              filter: _filter,
-              onChange: (f) => setState(() => _filter = f),
+              filter: filter,
+              onChange: filterCtl.set,
               counts: counts,
               total: records.length,
             ),
@@ -204,17 +221,6 @@ DoseStatus _toBadgeStatus(IntakeStatus s) => switch (s) {
 // 필터 행
 // ============================================================
 
-enum _DayFilter { all, completed, scheduled, missed }
-
-extension on _DayFilter {
-  IntakeStatus toStatus() => switch (this) {
-        _DayFilter.completed => IntakeStatus.taken,
-        _DayFilter.scheduled => IntakeStatus.pending,
-        _DayFilter.missed => IntakeStatus.missed,
-        _DayFilter.all => throw StateError('all has no single status'),
-      };
-}
-
 class _DayFilterRow extends StatelessWidget {
   const _DayFilterRow({
     required this.filter,
@@ -223,8 +229,8 @@ class _DayFilterRow extends StatelessWidget {
     required this.total,
   });
 
-  final _DayFilter filter;
-  final ValueChanged<_DayFilter> onChange;
+  final DayFilter filter;
+  final ValueChanged<DayFilter> onChange;
   final Map<IntakeStatus, int> counts;
   final int total;
 
@@ -239,8 +245,8 @@ class _DayFilterRow extends StatelessWidget {
               label: '전체',
               icon: Icons.format_list_bulleted_rounded,
               count: total,
-              selected: filter == _DayFilter.all,
-              onTap: () => onChange(_DayFilter.all),
+              selected: filter == DayFilter.all,
+              onTap: () => onChange(DayFilter.all),
             ),
           ),
           const SizedBox(width: 6),
@@ -249,8 +255,8 @@ class _DayFilterRow extends StatelessWidget {
               label: '완료',
               icon: Icons.check_rounded,
               count: counts[IntakeStatus.taken] ?? 0,
-              selected: filter == _DayFilter.completed,
-              onTap: () => onChange(_DayFilter.completed),
+              selected: filter == DayFilter.completed,
+              onTap: () => onChange(DayFilter.completed),
             ),
           ),
           const SizedBox(width: 6),
@@ -259,8 +265,8 @@ class _DayFilterRow extends StatelessWidget {
               label: '예정',
               icon: Icons.access_time_rounded,
               count: counts[IntakeStatus.pending] ?? 0,
-              selected: filter == _DayFilter.scheduled,
-              onTap: () => onChange(_DayFilter.scheduled),
+              selected: filter == DayFilter.scheduled,
+              onTap: () => onChange(DayFilter.scheduled),
             ),
           ),
           const SizedBox(width: 6),
@@ -269,8 +275,8 @@ class _DayFilterRow extends StatelessWidget {
               label: '놓침',
               icon: Icons.error_outline_rounded,
               count: counts[IntakeStatus.missed] ?? 0,
-              selected: filter == _DayFilter.missed,
-              onTap: () => onChange(_DayFilter.missed),
+              selected: filter == DayFilter.missed,
+              onTap: () => onChange(DayFilter.missed),
             ),
           ),
         ],

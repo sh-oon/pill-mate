@@ -43,7 +43,8 @@ class NotificationService {
             DarwinNotificationAction.plain(
               NotificationChannels.actionTaken,
               '복용 완료',
-              options: {DarwinNotificationActionOption.foreground},
+              // foreground 옵션 제거 → 앱을 열지 않고 백그라운드 isolate에서
+              // BackgroundActionDispatcher가 IntakeLog를 즉시 taken으로 기록.
             ),
             DarwinNotificationAction.plain(
               NotificationChannels.actionSnooze,

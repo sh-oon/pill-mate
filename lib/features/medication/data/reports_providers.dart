@@ -14,23 +14,25 @@ DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
   return (start: mon, end: mon.add(const Duration(days: 7)));
 }
 
-/// 주간 dose 일자별 묶음.
-final _weeklyDosesProvider =
-    FutureProvider<Map<DateTime, List<DoseInstance>>>((ref) async {
+/// 임의의 주(월요일 시작) 일자별 dose 묶음.
+final dosesByWeekStartProvider = FutureProvider.family
+    .autoDispose<Map<DateTime, List<DoseInstance>>, DateTime>(
+        (ref, weekStart) async {
   final repo = ref.watch(intakeRepositoryProvider);
   final medsAsync = ref.watch(medicationsStreamProvider);
-  final w = _currentWeek();
+  final start = _dateOnly(weekStart);
+  final end = start.add(const Duration(days: 7));
 
   return medsAsync.when(
     loading: () async => <DateTime, List<DoseInstance>>{},
     error: (e, st) async => throw e,
     data: (medsWithSchedules) async {
-      final logs = await repo.getRange(w.start, w.end);
+      final logs = await repo.getRange(start, end);
       final meds = medsWithSchedules.map((m) => m.medication).toList();
       final scheds = [for (final m in medsWithSchedules) ...m.schedules];
 
       final out = <DateTime, List<DoseInstance>>{};
-      for (var d = w.start; d.isBefore(w.end); d = d.add(const Duration(days: 1))) {
+      for (var d = start; d.isBefore(end); d = d.add(const Duration(days: 1))) {
         out[d] = computeDosesForDay(
           date: d,
           meds: meds,
@@ -41,6 +43,19 @@ final _weeklyDosesProvider =
       return out;
     },
   );
+});
+
+/// 이번 주 dose 묶음.
+final _weeklyDosesProvider =
+    FutureProvider<Map<DateTime, List<DoseInstance>>>((ref) {
+  return ref.watch(dosesByWeekStartProvider(_currentWeek().start).future);
+});
+
+/// 지난 주 dose 묶음.
+final _priorWeeklyDosesProvider =
+    FutureProvider<Map<DateTime, List<DoseInstance>>>((ref) {
+  final prior = _currentWeek().start.subtract(const Duration(days: 7));
+  return ref.watch(dosesByWeekStartProvider(prior).future);
 });
 
 class WeeklySummary {
@@ -208,6 +223,56 @@ final bestTimeOfDayProvider =
 /// 이번 주 총 완료 횟수.
 final weeklyTotalCompletedProvider = Provider<AsyncValue<int>>((ref) {
   return ref.watch(weeklySummaryProvider).whenData((s) => s.done);
+});
+
+/// 지난 주 요약 (delta 계산용).
+final _priorWeeklySummaryProvider =
+    Provider<AsyncValue<WeeklySummary>>((ref) {
+  final prior = _currentWeek().start.subtract(const Duration(days: 7));
+  return ref.watch(_priorWeeklyDosesProvider).whenData((byDay) {
+    var done = 0, pending = 0, missed = 0, total = 0;
+    for (final list in byDay.values) {
+      for (final d in list) {
+        total++;
+        switch (d.status) {
+          case IntakeStatus.taken:
+            done++;
+            break;
+          case IntakeStatus.pending:
+            pending++;
+            break;
+          case IntakeStatus.missed:
+            missed++;
+            break;
+          case IntakeStatus.skipped:
+            break;
+        }
+      }
+    }
+    return WeeklySummary(
+      weekStart: prior,
+      weekEnd: prior.add(const Duration(days: 7)),
+      done: done,
+      pending: pending,
+      missed: missed,
+      total: total,
+    );
+  });
+});
+
+/// 이번 주 완료율 − 지난 주 완료율 (정수 %p).
+/// 지난 주 데이터가 없으면 null.
+final weekDeltaPercentProvider = Provider<AsyncValue<int?>>((ref) {
+  final cur = ref.watch(weeklySummaryProvider);
+  final prev = ref.watch(_priorWeeklySummaryProvider);
+  return cur.whenData((c) {
+    final p = prev.value;
+    if (p == null || p.total == 0) return null;
+    if (c.total == 0) return null;
+    final curPct = (c.progress * 100).round();
+    final prevPct = (p.progress * 100).round();
+    return curPct - prevPct;
+  });
 });
 
 /// 주중 일자 표시용 한국어 약어.

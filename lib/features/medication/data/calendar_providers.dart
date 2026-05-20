@@ -33,6 +33,44 @@ final dayDosesProvider =
 /// 캘린더 한 일자 마크 종류.
 enum DayMarkKind { none, completed, scheduled, missed }
 
+/// 캘린더 일자 기록 필터.
+enum DayFilter { all, completed, scheduled, missed }
+
+extension DayFilterX on DayFilter {
+  IntakeStatus toStatus() => switch (this) {
+        DayFilter.completed => IntakeStatus.taken,
+        DayFilter.scheduled => IntakeStatus.pending,
+        DayFilter.missed => IntakeStatus.missed,
+        DayFilter.all => throw StateError('all has no single status'),
+      };
+}
+
+/// 캘린더 화면에서 현재 선택된 일자 필터.
+/// 홈 → 캘린더 진입 시 필터를 미리 지정할 수 있도록 전역 상태로 노출.
+class CalendarFilterNotifier extends Notifier<DayFilter> {
+  @override
+  DayFilter build() => DayFilter.all;
+  void set(DayFilter value) => state = value;
+}
+
+final calendarFilterProvider =
+    NotifierProvider<CalendarFilterNotifier, DayFilter>(
+  CalendarFilterNotifier.new,
+);
+
+/// 홈에서 캘린더로 이동할 때 보고 싶은 날짜를 미리 지정하기 위한 신호.
+/// null이면 캘린더 화면이 자체 보유한 선택 상태를 유지.
+class CalendarJumpDateNotifier extends Notifier<DateTime?> {
+  @override
+  DateTime? build() => null;
+  void set(DateTime? value) => state = value;
+}
+
+final calendarJumpDateProvider =
+    NotifierProvider<CalendarJumpDateNotifier, DateTime?>(
+  CalendarJumpDateNotifier.new,
+);
+
 /// 한 달 모든 일자의 마크 상태를 한 번에 계산.
 final monthMarksProvider = FutureProvider.family
     .autoDispose<Map<int, DayMarkKind>, ({int year, int month})>((ref, key) async {
