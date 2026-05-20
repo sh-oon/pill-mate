@@ -25,33 +25,34 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   ReportPeriod _period = ReportPeriod.weekly;
 
   /// 막대 차트 상세보기 — 캘린더 탭으로 이동하면서 가장 관련된 날짜를 선택.
-  /// 우선순위: 오늘 → 가장 최근 위험(완료율<60%) 일자 → 첫 일자.
-  void _openCalendarForBars(List<DailyPercent> list) {
+  /// 우선순위: 현재(오늘/이번 주/이번 달) → 가장 최근 위험(<60%) → 첫 항목.
+  void _openCalendarForBars(List<PeriodBucket> list) {
     if (list.isEmpty) {
       context.go(AppRoute.calendar);
       return;
     }
-    final today = list.firstWhere(
-      (p) => p.isToday,
+    final current = list.firstWhere(
+      (p) => p.isCurrent,
       orElse: () => list.first,
     );
     final risk = list.lastWhere(
       (p) => p.percent < 60,
-      orElse: () => today,
+      orElse: () => current,
     );
-    final target = today.isToday ? today : risk;
+    final target = current.isCurrent ? current : risk;
     ref.read(calendarJumpDateProvider.notifier).set(target.date);
     context.go(AppRoute.calendar);
   }
 
   @override
   Widget build(BuildContext context) {
-    final summaryAsync = ref.watch(weeklySummaryProvider);
-    final percentsAsync = ref.watch(dailyPercentsProvider);
+    final period = _period;
+    final summaryAsync = ref.watch(periodSummaryProvider(period));
+    final bucketsAsync = ref.watch(periodBucketsProvider(period));
     final streakAsync = ref.watch(streakProvider);
-    final bestTimeAsync = ref.watch(bestTimeOfDayProvider);
-    final totalAsync = ref.watch(weeklyTotalCompletedProvider);
-    final deltaAsync = ref.watch(weekDeltaPercentProvider);
+    final bestTimeAsync = ref.watch(periodBestTimeOfDayProvider(period));
+    final totalAsync = ref.watch(periodTotalCompletedProvider(period));
+    final deltaAsync = ref.watch(periodDeltaPercentProvider(period));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -76,8 +77,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               loading: () => const _LoadingCard(height: 280),
               error: (e, _) => _ErrorCard(error: e),
               data: (s) => WeekSummaryCard(
-                label: '이번 주 리포트',
-                dateRange: weekRangeLabel(s.weekStart, s.weekEnd),
+                label: periodTitleLabel(period),
+                dateRange: periodRangeLabel(s.range),
                 progress: s.progress,
                 done: s.done,
                 total: s.total,
@@ -149,7 +150,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 MetricRowSpec(
                   icon: Icons.event_available_rounded,
                   label: '총 완료 횟수',
-                  sublabel: '이번 주 합계',
+                  sublabel: _totalSublabel(period),
                   value: totalAsync.when(
                     loading: () => '…',
                     error: (_, _) => '-',
@@ -159,16 +160,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 ),
               ],
             ),
-            percentsAsync.when(
+            bucketsAsync.when(
               loading: () => const _LoadingCard(height: 220),
               error: (_, _) => const SizedBox.shrink(),
               data: (list) => WeeklyBarChart(
+                title: periodChartTitle(period),
                 bars: [
                   for (final p in list)
                     WeeklyBar(
-                      day: shortKoreanDay(p.date),
+                      day: p.label,
                       percent: p.percent,
-                      isToday: p.isToday,
+                      isToday: p.isCurrent,
                       isRisk: p.percent < 60,
                     ),
                 ],
@@ -181,6 +183,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
   }
 }
+
+String _totalSublabel(ReportPeriod period) => switch (period) {
+      ReportPeriod.weekly => '이번 주 합계',
+      ReportPeriod.monthly => '이번 달 합계',
+      ReportPeriod.yearly => '올해 합계',
+    };
 
 class _LoadingCard extends StatelessWidget {
   const _LoadingCard({required this.height});

@@ -18,19 +18,27 @@ class WeeklyBar {
   final bool isRisk;
 }
 
-/// `.chc` — 흰 박스 안 7일 막대 차트 + 헤더 액션.
+/// `.chc` — 흰 박스 안 가변 길이 막대 차트 + 헤더 액션.
+///
+/// weekly(7일)/monthly(4~5주)/yearly(12개월) 모두 지원 — `bars` 개수에 맞춰
+/// Expanded로 자동 분할.
 class WeeklyBarChart extends StatelessWidget {
   const WeeklyBarChart({
     super.key,
     required this.bars,
     required this.onDetailTap,
+    this.title = '최근 7일 복용 추이',
   });
 
   final List<WeeklyBar> bars;
   final VoidCallback onDetailTap;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
+    // 막대 개수가 많아지면 (yearly=12) 바 너비를 줄여 화면에 들어오도록.
+    final barWidth = bars.length <= 7 ? 22.0 : (bars.length <= 10 ? 18.0 : 14.0);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 22),
       padding: const EdgeInsets.all(18),
@@ -44,9 +52,9 @@ class WeeklyBarChart extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '최근 7일 복용 추이',
-                style: TextStyle(
+              Text(
+                title,
+                style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textStrong,
@@ -81,7 +89,7 @@ class WeeklyBarChart extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 for (final b in bars)
-                  Expanded(child: _Bar(bar: b)),
+                  Expanded(child: _Bar(bar: b, barWidth: barWidth)),
               ],
             ),
           ),
@@ -92,8 +100,9 @@ class WeeklyBarChart extends StatelessWidget {
 }
 
 class _Bar extends StatelessWidget {
-  const _Bar({required this.bar});
+  const _Bar({required this.bar, required this.barWidth});
   final WeeklyBar bar;
+  final double barWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +121,7 @@ class _Bar extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Container(
-          width: 22,
+          width: barWidth,
           height: 90,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
