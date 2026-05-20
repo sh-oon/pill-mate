@@ -10,8 +10,13 @@ import '../../../core/permissions/permission_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/storage/onboarding_storage.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/dialogs/about_dialog.dart';
+import '../../../core/widgets/dialogs/confirm_action_dialog.dart';
 import '../data/data_reset_service.dart';
 import '../data/notification_settings.dart';
+
+const String _kAppVersion = '0.1.0';
+const String _kAppName = '필메이트';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -122,12 +127,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
           // -------- 앱 정보 --------
           const _SectionHeader(title: '앱 정보'),
-          const AboutListTile(
-            icon: Icon(Icons.info_outline),
-            applicationName: '필메이트',
-            applicationVersion: '0.1.0',
-            applicationLegalese:
-                '오프라인 복약 관리 · 모든 데이터는 디바이스에만 저장됩니다.',
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('필메이트 정보'),
+            subtitle: const Text('버전 $_kAppVersion'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _showAboutDialog,
           ),
 
           if (kDebugMode) ...[
@@ -195,28 +200,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   }
 
   Future<void> _confirmReset() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('데이터를 모두 삭제할까요?'),
-        content: const Text(
-          '약, 일정, 복용 기록과 예약된 알림이 모두 사라져요.\n'
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: '데이터를 모두 삭제할까요?',
+      message: '약, 일정, 복용 기록과 예약된 알림이 모두 사라져요.\n'
           '이 작업은 되돌릴 수 없어요.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.missed),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
+      confirmLabel: '삭제',
+      icon: Icons.delete_forever_outlined,
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
 
     try {
       await ref.read(dataResetServiceProvider).resetAll();
@@ -230,6 +222,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         SnackBar(content: Text('초기화 실패: $e')),
       );
     }
+  }
+
+  Future<void> _showAboutDialog() {
+    return AboutAppDialog.show(
+      context,
+      appName: _kAppName,
+      appVersion: _kAppVersion,
+      description: '오프라인 복약 관리\n모든 데이터는 이 기기에만 저장돼요.',
+    );
   }
 }
 

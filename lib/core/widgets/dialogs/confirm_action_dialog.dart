@@ -1,31 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
-import '../app_buttons.dart';
+import 'app_dialog.dart';
 
-/// `.confirm-dlg` — 가운데 정렬 confirm 다이얼로그.
+/// `.confirm-dlg` — 취소/확인 두 버튼이 있는 가운데 정렬 confirm 다이얼로그.
 ///
 /// 호출: `final ok = await ConfirmActionDialog.show(...)`.
-class ConfirmActionDialog extends StatelessWidget {
-  const ConfirmActionDialog._({
-    required this.title,
-    required this.message,
-    required this.confirmLabel,
-    required this.cancelLabel,
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
-    this.destructive = true,
-  });
-
-  final String title;
-  final String message;
-  final String confirmLabel;
-  final String cancelLabel;
-  final IconData icon;
-  final Color iconBg;
-  final Color iconColor;
-  final bool destructive;
+///
+/// `AppDialog` 컴파운드 primitive들로 구성된 얇은 wrapper — destructive 액션에
+/// 자주 반복되는 형태(아이콘 배지 + 제목 + 설명 + 취소/확인 페어)를 한 함수
+/// 호출로 묶음.
+class ConfirmActionDialog {
+  const ConfirmActionDialog._();
 
   static Future<bool> show(
     BuildContext context, {
@@ -36,90 +21,30 @@ class ConfirmActionDialog extends StatelessWidget {
     IconData icon = Icons.delete_outline,
     bool destructive = true,
   }) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierColor: const Color(0x80141428), // .bd rgba(20,20,40,0.5)
-      builder: (_) => ConfirmActionDialog._(
-        title: title,
-        message: message,
-        confirmLabel: confirmLabel,
-        cancelLabel: cancelLabel,
-        icon: icon,
-        iconBg: destructive ? AppColors.missedTint : AppColors.primaryTint,
-        iconColor: destructive ? AppColors.missed : AppColors.primary,
-        destructive: destructive,
+    final tone = destructive ? AppDialogTone.danger : AppDialogTone.primary;
+    final ok = await AppDialog.show<bool>(
+      context,
+      child: AppDialog(
+        children: [
+          AppDialogIconBadge(
+            icon: icon,
+            tone: tone,
+            size: 56,
+            iconSize: 28,
+            shape: BoxShape.circle,
+          ),
+          AppDialogTitle(title),
+          AppDialogMessage(message),
+          AppDialogActionPair(
+            cancelLabel: cancelLabel,
+            confirmLabel: confirmLabel,
+            destructive: destructive,
+            onCancel: () => Navigator.of(context).pop<bool>(false),
+            onConfirm: () => Navigator.of(context).pop<bool>(true),
+          ),
+        ],
       ),
     );
     return ok ?? false;
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 30),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      backgroundColor: AppColors.surface,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 28, 22, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-              child: Icon(icon, size: 28, color: iconColor),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textStrong,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textMuted,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 22),
-            Row(
-              children: [
-                Expanded(
-                  child: AppButton(
-                    label: cancelLabel,
-                    variant: AppButtonVariant.secondary,
-                    fullWidth: true,
-                    onPressed: () => Navigator.of(context).pop<bool>(false),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: AppButton(
-                    label: confirmLabel,
-                    variant: destructive
-                        ? AppButtonVariant.danger
-                        : AppButtonVariant.primary,
-                    fullWidth: true,
-                    onPressed: () => Navigator.of(context).pop<bool>(true),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
-
