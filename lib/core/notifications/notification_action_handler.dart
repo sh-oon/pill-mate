@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/medication/data/intake_providers.dart';
+import '../../features/settings/data/notification_settings.dart';
 import '../router/app_router.dart';
 import 'background_actions.dart';
 import 'medication_notification_manager.dart';
@@ -76,12 +77,15 @@ class NotificationActionHandler {
         );
         break;
       case NotificationChannels.actionSnooze:
+        final minutes =
+            _container.read(notificationSettingsProvider).snoozeMinutes;
         await _container
             .read(medicationNotificationManagerProvider)
             .scheduleSnooze(
               scheduleId: payload.scheduleId,
               medicationId: payload.medicationId,
               originalScheduledAt: payload.scheduledAt,
+              delay: Duration(minutes: minutes),
             );
         break;
       default:

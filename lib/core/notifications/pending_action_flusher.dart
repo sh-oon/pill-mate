@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/medication/data/intake_providers.dart';
+import '../../features/settings/data/notification_settings.dart';
 import 'background_actions.dart';
+import 'medication_notification_manager.dart';
 import 'notification_channels.dart';
 
 /// 백그라운드 isolate에서 큐에 적재된 액션/스누즈를 main isolate에서 flush.
@@ -70,21 +72,26 @@ class PendingActionFlusher {
     final raw = prefs.getStringList(BackgroundActionDispatcher.prefsKeyPendingSnoozes);
     if (raw == null || raw.isEmpty) return;
 
-    final remaining = <String>[];
-    // 스누즈를 등록하려면 MedicationNotificationManager가 필요.
-    // PR 01(snooze)이 머지된 후에만 실 등록 가능 — 이 PR에서는 큐만 비우고 로그.
+    final manager = _container.read(medicationNotificationManagerProvider);
+    final minutes =
+        _container.read(notificationSettingsProvider).snoozeMinutes;
     for (final entry in raw) {
       final decoded = BackgroundActionDispatcher.decodeSnooze(entry);
       if (decoded == null) continue;
-      debugPrint(
-        'flush snooze (TODO once snooze API merged): '
-        'sched=${decoded.scheduleId} med=${decoded.medicationId}',
-      );
+      try {
+        await manager.scheduleSnooze(
+          scheduleId: decoded.scheduleId,
+          medicationId: decoded.medicationId,
+          originalScheduledAt: decoded.scheduledAt,
+          delay: Duration(minutes: minutes),
+        );
+      } catch (e) {
+        debugPrint('flush snooze fail (sched=${decoded.scheduleId}): $e');
+      }
     }
-    // 일단 비움 (PR 01과 머지 후 실 등록 로직 추가 예정).
     await prefs.setStringList(
       BackgroundActionDispatcher.prefsKeyPendingSnoozes,
-      remaining,
+      const <String>[],
     );
   }
 }
