@@ -20,6 +20,7 @@ import '../../../core/widgets/stat_grid_4.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/timeline_row.dart';
 import '../../../core/widgets/touchable_badge.dart';
+import '../../medication/data/calendar_providers.dart';
 import '../../medication/data/intake_providers.dart';
 import '../../medication/data/intake_repository.dart';
 
@@ -83,6 +84,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   (countsAsync.value!.missed > 0 ||
                       countsAsync.value!.pending > 0),
               onBellTap: () => _openBundleSheet(context, dosesAsync.value),
+              onSettingsTap: () => context.push(AppRoute.settings),
             ),
             if (_shouldShowBanner)
               Padding(
@@ -199,7 +201,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 // Summary card
 // ============================================================
 
-class _SummaryCard extends StatelessWidget {
+class _SummaryCard extends ConsumerWidget {
   const _SummaryCard({
     required this.countsAsync,
     required this.nextDoseAsync,
@@ -208,8 +210,14 @@ class _SummaryCard extends StatelessWidget {
   final AsyncValue<TodayCounts> countsAsync;
   final AsyncValue<DoseInstance?> nextDoseAsync;
 
+  void _goToCalendar(BuildContext context, WidgetRef ref, DayFilter filter) {
+    ref.read(calendarFilterProvider.notifier).set(filter);
+    ref.read(calendarJumpDateProvider.notifier).set(DateTime.now());
+    context.go(AppRoute.calendar);
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final counts = countsAsync.value ??
         const TodayCounts(done: 0, pending: 0, missed: 0, total: 0);
     final next = nextDoseAsync.value;
@@ -272,24 +280,28 @@ class _SummaryCard extends StatelessWidget {
                 label: '완료',
                 count: counts.done,
                 filled: true,
+                onTap: () => _goToCalendar(context, ref, DayFilter.completed),
               ),
               StatCell(
                 icon: Icons.access_time_rounded,
                 iconColor: AppColors.primary,
                 label: '예정',
                 count: counts.pending,
+                onTap: () => _goToCalendar(context, ref, DayFilter.scheduled),
               ),
               StatCell(
                 icon: Icons.error_outline_rounded,
                 iconColor: AppColors.missed,
                 label: '놓침',
                 count: counts.missed,
+                onTap: () => _goToCalendar(context, ref, DayFilter.missed),
               ),
               StatCell(
                 icon: Icons.format_list_bulleted_rounded,
                 iconColor: AppColors.textMuted,
                 label: '전체',
                 count: counts.total,
+                onTap: () => _goToCalendar(context, ref, DayFilter.all),
               ),
             ],
           ),
