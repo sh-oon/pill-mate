@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/database/tables/schedules.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_buttons.dart';
@@ -67,6 +68,11 @@ class _DetailBody extends ConsumerWidget {
     final isPrn = data.schedules.isEmpty;
     final alarmOn = data.schedules.any((s) => s.enabled);
     final times = data.times;
+    final firstSchedule = data.schedules.isEmpty ? null : data.schedules.first;
+    final remindBefore = firstSchedule?.remindBeforeMinutes ?? 0;
+    final endDate = firstSchedule?.endDate;
+    final memo = m.memo?.trim();
+    final hasMemo = memo != null && memo.isNotEmpty;
 
     String quantity() {
       final d = m.dosage, u = m.unit;
@@ -87,10 +93,25 @@ class _DetailBody extends ConsumerWidget {
       return '내일 ${times.first}';
     }
 
-    String repeatLabel() => switch (data.repeatKind) {
-          // RepeatKind enum import — using direct switch on already imported type
-          _ => isPrn ? '필요시 복용' : '매일',
-        };
+    String repeatLabel() {
+      if (isPrn) return '필요시 복용';
+      return switch (data.repeatKind) {
+        RepeatKind.daily => '매일',
+        RepeatKind.weekly => '요일별',
+        RepeatKind.interval => 'N일 간격',
+      };
+    }
+
+    String endDateLabel() {
+      if (endDate == null) return '없음';
+      final y = endDate.year, mo = endDate.month, d = endDate.day;
+      return '$y.${mo.toString().padLeft(2, '0')}.${d.toString().padLeft(2, '0')}';
+    }
+
+    String remindBeforeLabel() {
+      if (remindBefore <= 0) return '안 함';
+      return '$remindBefore분 전';
+    }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(0, 14, 0, 28),
@@ -128,6 +149,11 @@ class _DetailBody extends ConsumerWidget {
                   ),
                 ),
               ),
+            if (!isPrn)
+              _Row(
+                label: '사전 알림',
+                trailing: _ValueText(text: remindBeforeLabel()),
+              ),
           ],
         ),
         _Section(
@@ -143,9 +169,26 @@ class _DetailBody extends ConsumerWidget {
                   children: [for (final t in times) TimeChip(time: t)],
                 ),
               ),
-            _Row(label: '종료일', trailing: const _ValueText(text: '없음')),
+            _Row(label: '종료일', trailing: _ValueText(text: endDateLabel())),
           ],
         ),
+        if (hasMemo)
+          _Section(
+            title: '메모',
+            rows: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(
+                  memo,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textStrong,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
           child: Row(
@@ -205,16 +248,19 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 0, 22, 14),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            iconSize: 24,
-            color: AppColors.textStrong,
-            onPressed: onBack,
-            icon: const Icon(Icons.chevron_left),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              iconSize: 24,
+              color: AppColors.textStrong,
+              onPressed: onBack,
+              icon: const Icon(Icons.chevron_left),
+            ),
           ),
           const Text(
             '약 정보',
@@ -223,14 +269,6 @@ class _Header extends StatelessWidget {
               fontWeight: FontWeight.w700,
               color: AppColors.textStrong,
             ),
-          ),
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            iconSize: 24,
-            color: AppColors.textStrong,
-            onPressed: () {},
-            icon: const Icon(Icons.more_vert),
           ),
         ],
       ),
