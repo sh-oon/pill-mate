@@ -91,7 +91,9 @@ class IntakeRepository {
       ));
     }
 
-    // interval 약: 액션 후 큐 보강을 위해 sync 재호출 (daily/weekly는 멱등).
+    // 1) 같은 슬롯의 urgent 재알림 즉시 취소 (사용자 액션 후 추가 발화 막음).
+    await _notif.cancelUrgentForSchedule(scheduleId);
+    // 2) interval 약: 액션 후 큐 +1 보강 위해 sync 재호출 (daily/weekly는 멱등).
     await _notif.syncSchedulesFor(medicationId);
   }
 
