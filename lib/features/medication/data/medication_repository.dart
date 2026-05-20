@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables/schedules.dart';
+import '../../../core/notifications/medication_notification_manager.dart';
 
 /// 약 + 해당 약의 스케줄들을 한 묶음으로 노출.
 class MedicationWithSchedules {
@@ -54,9 +55,10 @@ class MedicationDraft {
 }
 
 class MedicationRepository {
-  MedicationRepository(this._db);
+  MedicationRepository(this._db, this._notif);
 
   final AppDatabase _db;
+  final MedicationNotificationManager _notif;
 
   /// 활성(미아카이브) 약 전체 + 스케줄을 실시간 스트림으로.
   Stream<List<MedicationWithSchedules>> watchAll() {
@@ -109,10 +111,10 @@ class MedicationRepository {
     return MedicationWithSchedules(medication: med, schedules: scheds);
   }
 
-  /// 신규 등록. 트랜잭션으로 medication + schedules 동시 insert.
-  Future<int> insertWithSchedules(MedicationDraft draft) {
-    return _db.transaction(() async {
-      final medId = await _db.into(_db.medications).insert(
+  /// 신규 등록. 트랜잭션으로 medication + schedules 동시 insert + 알림 동기화.
+  Future<int> insertWithSchedules(MedicationDraft draft) async {
+    final medId = await _db.transaction(() async {
+      final id = await _db.into(_db.medications).insert(
             MedicationsCompanion.insert(
               name: draft.name,
               category: Value(draft.category),
@@ -126,7 +128,7 @@ class MedicationRepository {
       for (final t in draft.times) {
         await _db.into(_db.schedules).insert(
               SchedulesCompanion.insert(
-                medicationId: medId,
+                medicationId: id,
                 timeOfDay: t,
                 startDate: startOfToday,
                 repeatKind: Value(draft.repeatKind),
@@ -135,13 +137,15 @@ class MedicationRepository {
               ),
             );
       }
-      return medId;
+      return id;
     });
+    await _notif.syncSchedulesFor(medId);
+    return medId;
   }
 
-  /// 기존 약 수정. 스케줄은 통째로 교체(단순).
-  Future<void> updateWithSchedules(int id, MedicationDraft draft) {
-    return _db.transaction(() async {
+  /// 기존 약 수정. 스케줄은 통째로 교체 + 알림 재동기화.
+  Future<void> updateWithSchedules(int id, MedicationDraft draft) async {
+    await _db.transaction(() async {
       await (_db.update(_db.medications)..where((m) => m.id.equals(id))).write(
         MedicationsCompanion(
           name: Value(draft.name),
@@ -169,17 +173,21 @@ class MedicationRepository {
             );
       }
     });
+    await _notif.syncSchedulesFor(id);
   }
 
-  /// hard delete (cascade로 schedules/intake_logs 같이 사라짐).
-  Future<void> delete(int id) {
-    return (_db.delete(_db.medications)..where((m) => m.id.equals(id))).go();
+  /// hard delete (cascade로 schedules/intake_logs 같이 사라짐). 알림도 먼저 취소.
+  Future<void> delete(int id) async {
+    // cascade로 schedules가 사라지기 전에 알림 취소 (id 매핑 위해).
+    await _notif.cancelForMedication(id);
+    await (_db.delete(_db.medications)..where((m) => m.id.equals(id))).go();
   }
 
-  /// 알람 on/off (모든 스케줄 enabled toggle).
-  Future<void> setAlarmEnabled(int medicationId, bool enabled) {
-    return (_db.update(_db.schedules)
+  /// 알람 on/off (모든 스케줄 enabled toggle) + 알림 동기화.
+  Future<void> setAlarmEnabled(int medicationId, bool enabled) async {
+    await (_db.update(_db.schedules)
           ..where((s) => s.medicationId.equals(medicationId)))
         .write(SchedulesCompanion(enabled: Value(enabled)));
+    await _notif.syncSchedulesFor(medicationId);
   }
 }

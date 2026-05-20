@@ -5,6 +5,7 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'notification_action_handler.dart';
 import 'notification_channels.dart';
 
 /// 알림 인프라 초기화 + 채널 등록 + 권한 요청.
@@ -60,9 +61,9 @@ class NotificationService {
 
     await _plugin.initialize(
       InitializationSettings(android: androidInit, iOS: iosInit),
-      onDidReceiveNotificationResponse: _handleResponse,
+      onDidReceiveNotificationResponse: handleNotificationResponse,
       onDidReceiveBackgroundNotificationResponse:
-          _handleBackgroundResponse,
+          handleBackgroundNotificationResponse,
     );
 
     await _registerAndroidChannels();
@@ -129,15 +130,7 @@ class NotificationService {
     return iosGranted && androidGranted && exactAlarm;
   }
 
-  static void _handleResponse(NotificationResponse response) {
-    // TODO: deep link to intake check screen, mark taken/skipped/snooze.
-    debugPrint('notif response: ${response.actionId} ${response.payload}');
-  }
-
-  @pragma('vm:entry-point')
-  static void _handleBackgroundResponse(NotificationResponse response) {
-    debugPrint('notif bg response: ${response.actionId} ${response.payload}');
-  }
+  // 콜백은 notification_action_handler.dart의 top-level 함수로 이전.
 }
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {
