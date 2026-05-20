@@ -4,9 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/medication/data/intake_providers.dart';
 import '../router/app_router.dart';
+import 'background_actions.dart';
+import 'medication_notification_manager.dart';
 import 'notification_channels.dart';
 
 /// 알림 payload 파싱 결과 — `dose:scheduleId:medicationId:isoScheduledAt`.
+///
+/// 백그라운드 isolate에서도 import 가능하도록 top-level public.
 class DosePayload {
   const DosePayload({
     required this.scheduleId,
@@ -72,8 +76,13 @@ class NotificationActionHandler {
         );
         break;
       case NotificationChannels.actionSnooze:
-        // TODO: 10분 뒤 일회성 알림 등록 — 별도 헬퍼 필요.
-        debugPrint('snooze (TODO 10min one-shot): ${payload.scheduleId}');
+        await _container
+            .read(medicationNotificationManagerProvider)
+            .scheduleSnooze(
+              scheduleId: payload.scheduleId,
+              medicationId: payload.medicationId,
+              originalScheduledAt: payload.scheduledAt,
+            );
         break;
       default:
         // 액션 없이 알림 본문 탭한 경우 → 약 상세로 deep link.
@@ -101,11 +110,11 @@ void handleNotificationResponse(NotificationResponse response) {
 }
 
 /// Background isolate 콜백 — 새 isolate에서 실행되므로 _globalHandler가 null.
-/// Phase 3에서는 로그만 남기고 다음 앱 실행 시 사용자가 직접 처리.
+/// 새 ProviderContainer 없이 최소 의존성(AppDatabase, SharedPreferences)으로
+/// BackgroundActionDispatcher가 즉시 처리. 실패 시 SharedPreferences 큐에
+/// 적재되어 다음 앱 부팅 시 flush.
 @pragma('vm:entry-point')
 void handleBackgroundNotificationResponse(NotificationResponse response) {
-  debugPrint(
-    'background notification action — pending: '
-    '${response.actionId} / ${response.payload}',
-  );
+  // top-level fire-and-forget. await 불가.
+  BackgroundActionDispatcher.dispatch(response);
 }
