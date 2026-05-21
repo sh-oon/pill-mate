@@ -22,3 +22,24 @@ final trackedMedicationByIdProvider =
     StreamProvider.family<TrackedMedicationWithSchedules?, int>((ref, id) {
   return ref.watch(trackedMedicationRepositoryProvider).watchById(id);
 });
+
+/// 현재 enabled 상태의 schedule들이 사용 중인 "HH:mm" 시각 distinct 목록.
+/// 등록 플로우 Step 3에서 quick-pick chip으로 사용 — 기존 알람 시간을 골라
+/// 동일 시각에 약을 묶어 알림 받을 수 있도록.
+final existingAlarmTimesProvider = StreamProvider<List<String>>((ref) {
+  final medsAsync = ref.watch(trackedMedicationsStreamProvider);
+  return medsAsync.when(
+    loading: () => Stream.value(const <String>[]),
+    error: (e, st) => Stream.error(e, st),
+    data: (meds) {
+      final times = <String>{};
+      for (final m in meds) {
+        for (final s in m.schedules) {
+          if (s.enabled) times.add(s.timeOfDay);
+        }
+      }
+      final sorted = times.toList()..sort();
+      return Stream.value(sorted);
+    },
+  );
+});
