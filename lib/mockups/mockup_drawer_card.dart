@@ -26,7 +26,6 @@ class MockupDrawerCard extends StatelessWidget {
             meta: '영양제 · 1000 IU · 오늘 1회',
             hasAlarm: true,
             nextTime: '오후 8:00',
-            isSeed: true,
           ),
           const SizedBox(height: 10),
           _Card(
@@ -34,7 +33,6 @@ class MockupDrawerCard extends StatelessWidget {
             meta: '영양제 · 1000 mg · 매일 1회',
             hasAlarm: true,
             nextTime: '아침 9:00',
-            isSeed: true,
           ),
           const SizedBox(height: 24),
           Text('알람 없음', style: AppTypography.labelStrong),
@@ -48,14 +46,12 @@ class MockupDrawerCard extends StatelessWidget {
             name: '유산균',
             meta: '영양제 · 100억 · 알람 미설정',
             hasAlarm: false,
-            isSeed: true,
           ),
           const SizedBox(height: 10),
           _Card(
             name: '내가 추가한 약',
             meta: '약 · 직접 입력',
             hasAlarm: false,
-            isSeed: false,
           ),
           const SizedBox(height: 24),
           Container(
@@ -89,14 +85,12 @@ class _Card extends StatelessWidget {
     required this.meta,
     required this.hasAlarm,
     this.nextTime,
-    this.isSeed = false,
   });
 
   final String name;
   final String meta;
   final bool hasAlarm;
   final String? nextTime;
-  final bool isSeed;
 
   @override
   Widget build(BuildContext context) {
@@ -124,22 +118,7 @@ class _Card extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Flexible(child: Text(name, style: AppTypography.titleMedium, overflow: TextOverflow.ellipsis)),
-                    if (isSeed) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.successTint,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text('seed', style: AppTypography.bodySmall.copyWith(color: AppColors.success, fontSize: 10, fontWeight: FontWeight.w700)),
-                      ),
-                    ],
-                  ],
-                ),
+                Text(name, style: AppTypography.titleMedium, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
                 Text(meta, style: AppTypography.bodySmall, overflow: TextOverflow.ellipsis),
               ],

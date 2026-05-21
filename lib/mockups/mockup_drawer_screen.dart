@@ -381,24 +381,7 @@ class _DrawerCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(item.name, style: AppTypography.titleMedium, overflow: TextOverflow.ellipsis),
-                      ),
-                      if (item.isSeed) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.successTint,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text('seed', style: AppTypography.bodySmall.copyWith(color: AppColors.success, fontSize: 10, fontWeight: FontWeight.w700)),
-                        ),
-                      ],
-                    ],
-                  ),
+                  Text(item.name, style: AppTypography.titleMedium, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
                   Text(item.meta, style: AppTypography.bodySmall, overflow: TextOverflow.ellipsis),
                 ],
@@ -534,14 +517,12 @@ class _DrawerItemMock {
     required this.meta,
     required this.hasAlarm,
     this.nextTime,
-    this.isSeed = true,
   });
 
   final String name;
   final String meta;
   final bool hasAlarm;
   final String? nextTime;
-  final bool isSeed;
 }
 
 const _items = <_DrawerItemMock>[
@@ -572,6 +553,5 @@ const _items = <_DrawerItemMock>[
     name: '내가 추가한 약',
     meta: '약 · 직접 입력 · 알람 미설정',
     hasAlarm: false,
-    isSeed: false,
   ),
 ];
