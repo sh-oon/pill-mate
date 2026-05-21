@@ -66,12 +66,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>fetch</string>
-		<string>processing</string>
-		<string>remote-notification</string>
-	</array>
+	<!--
+	  Background modes intentionally not declared.
+	  This app uses flutter_local_notifications (UNUserNotificationCenter)
+	  which schedules notifications via the OS — no app background execution required.
+	  No remote push (APNs), no BGTaskScheduler usage.
+	-->
 	<key>NSUserNotificationUsageDescription</key>
 	<string>복용 시각과 미복용 시 긴급 알림을 받기 위해 알림 권한이 필요합니다.</string>
 	<key>CFBundleLocalizations</key>

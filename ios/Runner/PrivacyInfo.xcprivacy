@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Apple Privacy Manifest for Pill Mate (pill_mate)
+  Required by App Store since 2024-05.
+  Reference: https://developer.apple.com/documentation/bundleresources/privacy_manifest_files
+
+  This app is fully offline:
+    - No network requests
+    - No data collected from users
+    - No tracking
+    - No third-party advertising or analytics SDKs
+
+  Declared API usages are required by Flutter and bundled plugins
+  (shared_preferences, path_provider, drift/sqlite3_flutter_libs,
+   flutter_local_notifications, permission_handler).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <!-- shared_preferences (NSUserDefaults backing store) -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- CA92.1: Access user defaults for app functionality (onboarding flag, settings) -->
+                <string>CA92.1</string>
+            </array>
+        </dict>
+
+        <!-- path_provider / drift_flutter: read app sandbox file timestamps -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- C617.1: Inside app container, access timestamps of files the app itself created -->
+                <string>C617.1</string>
+            </array>
+        </dict>
+
+        <!-- sqlite3_flutter_libs / drift: query disk space before DB writes -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- E174.1: Check available disk space before write operations -->
+                <string>E174.1</string>
+            </array>
+        </dict>
+
+        <!-- Flutter engine system boot time (uptime) for time calculations -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- 35F9.1: Measure elapsed time for internal app operations -->
+                <string>35F9.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

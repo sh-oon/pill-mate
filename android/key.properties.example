@@ -1,0 +1,15 @@
+# Copy to `android/key.properties` and fill in real values.
+# `key.properties` must remain gitignored.
+#
+# Generate keystore (one-time):
+#   keytool -genkey -v -keystore ~/pill-mate-upload.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+# For Play App Signing, this is your UPLOAD key (not the app-signing key).
+# Google manages the actual signing key after first upload to Play Console.
+
+storePassword=
+keyPassword=
+keyAlias=upload
+# Use an absolute path. Example: /Users/gamja/keystores/pill-mate-upload.jks
+storeFile=
