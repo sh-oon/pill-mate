@@ -13,11 +13,21 @@ enum IntakeStatus { pending, taken, skipped, missed }
 class IntakeLogs extends Table {
   IntColumn get id => integer().autoIncrement()();
 
-  /// FK → tracked_medications.id. 변수명은 호환성 위해 medicationId 유지.
+  /// FK → tracked_medications.id. tracked 삭제 시 setNull — 복용 기록은 DB에
+  /// 보존하되 origin tracked는 사라짐. 표시용 이름은 [medNameSnapshot].
+  /// 변수명은 호환성 위해 medicationId 유지.
   IntColumn get medicationId =>
-      integer().references(TrackedMedications, #id, onDelete: KeyAction.cascade)();
+      integer().nullable().references(TrackedMedications, #id, onDelete: KeyAction.setNull)();
+
+  /// FK → schedules.id. tracked 삭제 시 cascade로 schedules도 사라지므로
+  /// 이 FK도 동반 setNull.
   IntColumn get scheduleId =>
-      integer().references(Schedules, #id, onDelete: KeyAction.cascade)();
+      integer().nullable().references(Schedules, #id, onDelete: KeyAction.setNull)();
+
+  /// tracked 삭제 후에도 어떤 약의 기록이었는지 식별할 수 있도록 이름 스냅샷.
+  /// [TrackedMedicationRepository.delete] 호출 시점에 tracked.name을 복사.
+  /// tracked가 살아 있는 동안엔 null.
+  TextColumn get medNameSnapshot => text().nullable()();
 
   /// 예정된 시각 (로컬 wallclock 기준 DateTime)
   DateTimeColumn get scheduledAt => dateTime()();

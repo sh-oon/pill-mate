@@ -26,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -51,6 +51,46 @@ class AppDatabase extends _$AppDatabase {
             await customStatement('PRAGMA foreign_keys = ON');
             await m.createAll();
             await _seedCatalogIfEmpty();
+            return;
+          }
+
+          // v6: intake_logs FK cascade → setNull. tracked 삭제해도 기록 보존.
+          // medNameSnapshot 컬럼 추가. SQLite는 FK constraint를 ALTER TABLE로
+          // 변경 못 하므로 표준 패턴: 새 테이블 만들고 복사 후 swap.
+          if (from < 6) {
+            await customStatement('PRAGMA foreign_keys = OFF');
+            await customStatement('''
+              CREATE TABLE intake_logs_new (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                medication_id INTEGER NULL
+                  REFERENCES tracked_medications(id) ON DELETE SET NULL,
+                schedule_id INTEGER NULL
+                  REFERENCES schedules(id) ON DELETE SET NULL,
+                med_name_snapshot TEXT NULL,
+                scheduled_at INTEGER NOT NULL,
+                acted_at INTEGER NULL,
+                status INTEGER NOT NULL DEFAULT 0,
+                urgent_fired_count INTEGER NOT NULL DEFAULT 0,
+                memo TEXT NULL,
+                created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+                updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+              )
+            ''');
+            await customStatement('''
+              INSERT INTO intake_logs_new
+                (id, medication_id, schedule_id, med_name_snapshot,
+                 scheduled_at, acted_at, status, urgent_fired_count, memo,
+                 created_at, updated_at)
+              SELECT
+                id, medication_id, schedule_id, NULL,
+                scheduled_at, acted_at, status, urgent_fired_count, memo,
+                created_at, updated_at
+              FROM intake_logs
+            ''');
+            await customStatement('DROP TABLE intake_logs');
+            await customStatement(
+                'ALTER TABLE intake_logs_new RENAME TO intake_logs');
+            await customStatement('PRAGMA foreign_keys = ON');
             return;
           }
         },

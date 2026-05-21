@@ -82,8 +82,8 @@ class BackgroundActionDispatcher {
     if (existing == null) {
       await db.into(db.intakeLogs).insert(
             IntakeLogsCompanion.insert(
-              medicationId: p.medicationId,
-              scheduleId: p.scheduleId,
+              medicationId: Value(p.medicationId),
+              scheduleId: Value(p.scheduleId),
               scheduledAt: p.scheduledAt,
               status: Value(status),
               actedAt: Value(now),

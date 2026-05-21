@@ -2413,11 +2413,11 @@ class $IntakeLogsTable extends IntakeLogs
   late final GeneratedColumn<int> medicationId = GeneratedColumn<int>(
     'medication_id',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.int,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES tracked_medications (id) ON DELETE CASCADE',
+      'REFERENCES tracked_medications (id) ON DELETE SET NULL',
     ),
   );
   static const VerificationMeta _scheduleIdMeta = const VerificationMeta(
@@ -2427,12 +2427,23 @@ class $IntakeLogsTable extends IntakeLogs
   late final GeneratedColumn<int> scheduleId = GeneratedColumn<int>(
     'schedule_id',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.int,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES schedules (id) ON DELETE CASCADE',
+      'REFERENCES schedules (id) ON DELETE SET NULL',
     ),
+  );
+  static const VerificationMeta _medNameSnapshotMeta = const VerificationMeta(
+    'medNameSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> medNameSnapshot = GeneratedColumn<String>(
+    'med_name_snapshot',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _scheduledAtMeta = const VerificationMeta(
     'scheduledAt',
@@ -2516,6 +2527,7 @@ class $IntakeLogsTable extends IntakeLogs
     id,
     medicationId,
     scheduleId,
+    medNameSnapshot,
     scheduledAt,
     actedAt,
     status,
@@ -2547,16 +2559,21 @@ class $IntakeLogsTable extends IntakeLogs
           _medicationIdMeta,
         ),
       );
-    } else if (isInserting) {
-      context.missing(_medicationIdMeta);
     }
     if (data.containsKey('schedule_id')) {
       context.handle(
         _scheduleIdMeta,
         scheduleId.isAcceptableOrUnknown(data['schedule_id']!, _scheduleIdMeta),
       );
-    } else if (isInserting) {
-      context.missing(_scheduleIdMeta);
+    }
+    if (data.containsKey('med_name_snapshot')) {
+      context.handle(
+        _medNameSnapshotMeta,
+        medNameSnapshot.isAcceptableOrUnknown(
+          data['med_name_snapshot']!,
+          _medNameSnapshotMeta,
+        ),
+      );
     }
     if (data.containsKey('scheduled_at')) {
       context.handle(
@@ -2618,11 +2635,15 @@ class $IntakeLogsTable extends IntakeLogs
       medicationId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}medication_id'],
-      )!,
+      ),
       scheduleId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}schedule_id'],
-      )!,
+      ),
+      medNameSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}med_name_snapshot'],
+      ),
       scheduledAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}scheduled_at'],
@@ -2668,9 +2689,19 @@ class $IntakeLogsTable extends IntakeLogs
 class IntakeLog extends DataClass implements Insertable<IntakeLog> {
   final int id;
 
-  /// FK → tracked_medications.id. 변수명은 호환성 위해 medicationId 유지.
-  final int medicationId;
-  final int scheduleId;
+  /// FK → tracked_medications.id. tracked 삭제 시 setNull — 복용 기록은 DB에
+  /// 보존하되 origin tracked는 사라짐. 표시용 이름은 [medNameSnapshot].
+  /// 변수명은 호환성 위해 medicationId 유지.
+  final int? medicationId;
+
+  /// FK → schedules.id. tracked 삭제 시 cascade로 schedules도 사라지므로
+  /// 이 FK도 동반 setNull.
+  final int? scheduleId;
+
+  /// tracked 삭제 후에도 어떤 약의 기록이었는지 식별할 수 있도록 이름 스냅샷.
+  /// [TrackedMedicationRepository.delete] 호출 시점에 tracked.name을 복사.
+  /// tracked가 살아 있는 동안엔 null.
+  final String? medNameSnapshot;
 
   /// 예정된 시각 (로컬 wallclock 기준 DateTime)
   final DateTime scheduledAt;
@@ -2686,8 +2717,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
   final DateTime updatedAt;
   const IntakeLog({
     required this.id,
-    required this.medicationId,
-    required this.scheduleId,
+    this.medicationId,
+    this.scheduleId,
+    this.medNameSnapshot,
     required this.scheduledAt,
     this.actedAt,
     required this.status,
@@ -2700,8 +2732,15 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
-    map['medication_id'] = Variable<int>(medicationId);
-    map['schedule_id'] = Variable<int>(scheduleId);
+    if (!nullToAbsent || medicationId != null) {
+      map['medication_id'] = Variable<int>(medicationId);
+    }
+    if (!nullToAbsent || scheduleId != null) {
+      map['schedule_id'] = Variable<int>(scheduleId);
+    }
+    if (!nullToAbsent || medNameSnapshot != null) {
+      map['med_name_snapshot'] = Variable<String>(medNameSnapshot);
+    }
     map['scheduled_at'] = Variable<DateTime>(scheduledAt);
     if (!nullToAbsent || actedAt != null) {
       map['acted_at'] = Variable<DateTime>(actedAt);
@@ -2723,8 +2762,15 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
   IntakeLogsCompanion toCompanion(bool nullToAbsent) {
     return IntakeLogsCompanion(
       id: Value(id),
-      medicationId: Value(medicationId),
-      scheduleId: Value(scheduleId),
+      medicationId: medicationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medicationId),
+      scheduleId: scheduleId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(scheduleId),
+      medNameSnapshot: medNameSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medNameSnapshot),
       scheduledAt: Value(scheduledAt),
       actedAt: actedAt == null && nullToAbsent
           ? const Value.absent()
@@ -2744,8 +2790,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return IntakeLog(
       id: serializer.fromJson<int>(json['id']),
-      medicationId: serializer.fromJson<int>(json['medicationId']),
-      scheduleId: serializer.fromJson<int>(json['scheduleId']),
+      medicationId: serializer.fromJson<int?>(json['medicationId']),
+      scheduleId: serializer.fromJson<int?>(json['scheduleId']),
+      medNameSnapshot: serializer.fromJson<String?>(json['medNameSnapshot']),
       scheduledAt: serializer.fromJson<DateTime>(json['scheduledAt']),
       actedAt: serializer.fromJson<DateTime?>(json['actedAt']),
       status: $IntakeLogsTable.$converterstatus.fromJson(
@@ -2762,8 +2809,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
-      'medicationId': serializer.toJson<int>(medicationId),
-      'scheduleId': serializer.toJson<int>(scheduleId),
+      'medicationId': serializer.toJson<int?>(medicationId),
+      'scheduleId': serializer.toJson<int?>(scheduleId),
+      'medNameSnapshot': serializer.toJson<String?>(medNameSnapshot),
       'scheduledAt': serializer.toJson<DateTime>(scheduledAt),
       'actedAt': serializer.toJson<DateTime?>(actedAt),
       'status': serializer.toJson<int>(
@@ -2778,8 +2826,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
 
   IntakeLog copyWith({
     int? id,
-    int? medicationId,
-    int? scheduleId,
+    Value<int?> medicationId = const Value.absent(),
+    Value<int?> scheduleId = const Value.absent(),
+    Value<String?> medNameSnapshot = const Value.absent(),
     DateTime? scheduledAt,
     Value<DateTime?> actedAt = const Value.absent(),
     IntakeStatus? status,
@@ -2789,8 +2838,11 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
     DateTime? updatedAt,
   }) => IntakeLog(
     id: id ?? this.id,
-    medicationId: medicationId ?? this.medicationId,
-    scheduleId: scheduleId ?? this.scheduleId,
+    medicationId: medicationId.present ? medicationId.value : this.medicationId,
+    scheduleId: scheduleId.present ? scheduleId.value : this.scheduleId,
+    medNameSnapshot: medNameSnapshot.present
+        ? medNameSnapshot.value
+        : this.medNameSnapshot,
     scheduledAt: scheduledAt ?? this.scheduledAt,
     actedAt: actedAt.present ? actedAt.value : this.actedAt,
     status: status ?? this.status,
@@ -2808,6 +2860,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
       scheduleId: data.scheduleId.present
           ? data.scheduleId.value
           : this.scheduleId,
+      medNameSnapshot: data.medNameSnapshot.present
+          ? data.medNameSnapshot.value
+          : this.medNameSnapshot,
       scheduledAt: data.scheduledAt.present
           ? data.scheduledAt.value
           : this.scheduledAt,
@@ -2828,6 +2883,7 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
           ..write('id: $id, ')
           ..write('medicationId: $medicationId, ')
           ..write('scheduleId: $scheduleId, ')
+          ..write('medNameSnapshot: $medNameSnapshot, ')
           ..write('scheduledAt: $scheduledAt, ')
           ..write('actedAt: $actedAt, ')
           ..write('status: $status, ')
@@ -2844,6 +2900,7 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
     id,
     medicationId,
     scheduleId,
+    medNameSnapshot,
     scheduledAt,
     actedAt,
     status,
@@ -2859,6 +2916,7 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
           other.id == this.id &&
           other.medicationId == this.medicationId &&
           other.scheduleId == this.scheduleId &&
+          other.medNameSnapshot == this.medNameSnapshot &&
           other.scheduledAt == this.scheduledAt &&
           other.actedAt == this.actedAt &&
           other.status == this.status &&
@@ -2870,8 +2928,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
 
 class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
   final Value<int> id;
-  final Value<int> medicationId;
-  final Value<int> scheduleId;
+  final Value<int?> medicationId;
+  final Value<int?> scheduleId;
+  final Value<String?> medNameSnapshot;
   final Value<DateTime> scheduledAt;
   final Value<DateTime?> actedAt;
   final Value<IntakeStatus> status;
@@ -2883,6 +2942,7 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
     this.id = const Value.absent(),
     this.medicationId = const Value.absent(),
     this.scheduleId = const Value.absent(),
+    this.medNameSnapshot = const Value.absent(),
     this.scheduledAt = const Value.absent(),
     this.actedAt = const Value.absent(),
     this.status = const Value.absent(),
@@ -2893,8 +2953,9 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
   });
   IntakeLogsCompanion.insert({
     this.id = const Value.absent(),
-    required int medicationId,
-    required int scheduleId,
+    this.medicationId = const Value.absent(),
+    this.scheduleId = const Value.absent(),
+    this.medNameSnapshot = const Value.absent(),
     required DateTime scheduledAt,
     this.actedAt = const Value.absent(),
     this.status = const Value.absent(),
@@ -2902,13 +2963,12 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
     this.memo = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
-  }) : medicationId = Value(medicationId),
-       scheduleId = Value(scheduleId),
-       scheduledAt = Value(scheduledAt);
+  }) : scheduledAt = Value(scheduledAt);
   static Insertable<IntakeLog> custom({
     Expression<int>? id,
     Expression<int>? medicationId,
     Expression<int>? scheduleId,
+    Expression<String>? medNameSnapshot,
     Expression<DateTime>? scheduledAt,
     Expression<DateTime>? actedAt,
     Expression<int>? status,
@@ -2921,6 +2981,7 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
       if (id != null) 'id': id,
       if (medicationId != null) 'medication_id': medicationId,
       if (scheduleId != null) 'schedule_id': scheduleId,
+      if (medNameSnapshot != null) 'med_name_snapshot': medNameSnapshot,
       if (scheduledAt != null) 'scheduled_at': scheduledAt,
       if (actedAt != null) 'acted_at': actedAt,
       if (status != null) 'status': status,
@@ -2933,8 +2994,9 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
 
   IntakeLogsCompanion copyWith({
     Value<int>? id,
-    Value<int>? medicationId,
-    Value<int>? scheduleId,
+    Value<int?>? medicationId,
+    Value<int?>? scheduleId,
+    Value<String?>? medNameSnapshot,
     Value<DateTime>? scheduledAt,
     Value<DateTime?>? actedAt,
     Value<IntakeStatus>? status,
@@ -2947,6 +3009,7 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
       id: id ?? this.id,
       medicationId: medicationId ?? this.medicationId,
       scheduleId: scheduleId ?? this.scheduleId,
+      medNameSnapshot: medNameSnapshot ?? this.medNameSnapshot,
       scheduledAt: scheduledAt ?? this.scheduledAt,
       actedAt: actedAt ?? this.actedAt,
       status: status ?? this.status,
@@ -2968,6 +3031,9 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
     }
     if (scheduleId.present) {
       map['schedule_id'] = Variable<int>(scheduleId.value);
+    }
+    if (medNameSnapshot.present) {
+      map['med_name_snapshot'] = Variable<String>(medNameSnapshot.value);
     }
     if (scheduledAt.present) {
       map['scheduled_at'] = Variable<DateTime>(scheduledAt.value);
@@ -3001,6 +3067,7 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
           ..write('id: $id, ')
           ..write('medicationId: $medicationId, ')
           ..write('scheduleId: $scheduleId, ')
+          ..write('medNameSnapshot: $medNameSnapshot, ')
           ..write('scheduledAt: $scheduledAt, ')
           ..write('actedAt: $actedAt, ')
           ..write('status: $status, ')
@@ -3418,14 +3485,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         'tracked_medications',
         limitUpdateKind: UpdateKind.delete,
       ),
-      result: [TableUpdate('intake_logs', kind: UpdateKind.delete)],
+      result: [TableUpdate('intake_logs', kind: UpdateKind.update)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'schedules',
         limitUpdateKind: UpdateKind.delete,
       ),
-      result: [TableUpdate('intake_logs', kind: UpdateKind.delete)],
+      result: [TableUpdate('intake_logs', kind: UpdateKind.update)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -5282,8 +5349,9 @@ typedef $$SchedulesTableProcessedTableManager =
 typedef $$IntakeLogsTableCreateCompanionBuilder =
     IntakeLogsCompanion Function({
       Value<int> id,
-      required int medicationId,
-      required int scheduleId,
+      Value<int?> medicationId,
+      Value<int?> scheduleId,
+      Value<String?> medNameSnapshot,
       required DateTime scheduledAt,
       Value<DateTime?> actedAt,
       Value<IntakeStatus> status,
@@ -5295,8 +5363,9 @@ typedef $$IntakeLogsTableCreateCompanionBuilder =
 typedef $$IntakeLogsTableUpdateCompanionBuilder =
     IntakeLogsCompanion Function({
       Value<int> id,
-      Value<int> medicationId,
-      Value<int> scheduleId,
+      Value<int?> medicationId,
+      Value<int?> scheduleId,
+      Value<String?> medNameSnapshot,
       Value<DateTime> scheduledAt,
       Value<DateTime?> actedAt,
       Value<IntakeStatus> status,
@@ -5318,9 +5387,9 @@ final class $$IntakeLogsTableReferences
         ),
       );
 
-  $$TrackedMedicationsTableProcessedTableManager get medicationId {
-    final $_column = $_itemColumn<int>('medication_id')!;
-
+  $$TrackedMedicationsTableProcessedTableManager? get medicationId {
+    final $_column = $_itemColumn<int>('medication_id');
+    if ($_column == null) return null;
     final manager = $$TrackedMedicationsTableTableManager(
       $_db,
       $_db.trackedMedications,
@@ -5337,9 +5406,9 @@ final class $$IntakeLogsTableReferences
         $_aliasNameGenerator(db.intakeLogs.scheduleId, db.schedules.id),
       );
 
-  $$SchedulesTableProcessedTableManager get scheduleId {
-    final $_column = $_itemColumn<int>('schedule_id')!;
-
+  $$SchedulesTableProcessedTableManager? get scheduleId {
+    final $_column = $_itemColumn<int>('schedule_id');
+    if ($_column == null) return null;
     final manager = $$SchedulesTableTableManager(
       $_db,
       $_db.schedules,
@@ -5363,6 +5432,11 @@ class $$IntakeLogsTableFilterComposer
   });
   ColumnFilters<int> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get medNameSnapshot => $composableBuilder(
+    column: $table.medNameSnapshot,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5463,6 +5537,11 @@ class $$IntakeLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get medNameSnapshot => $composableBuilder(
+    column: $table.medNameSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get scheduledAt => $composableBuilder(
     column: $table.scheduledAt,
     builder: (column) => ColumnOrderings(column),
@@ -5556,6 +5635,11 @@ class $$IntakeLogsTableAnnotationComposer
   });
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get medNameSnapshot => $composableBuilder(
+    column: $table.medNameSnapshot,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get scheduledAt => $composableBuilder(
     column: $table.scheduledAt,
@@ -5659,8 +5743,9 @@ class $$IntakeLogsTableTableManager
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
-                Value<int> medicationId = const Value.absent(),
-                Value<int> scheduleId = const Value.absent(),
+                Value<int?> medicationId = const Value.absent(),
+                Value<int?> scheduleId = const Value.absent(),
+                Value<String?> medNameSnapshot = const Value.absent(),
                 Value<DateTime> scheduledAt = const Value.absent(),
                 Value<DateTime?> actedAt = const Value.absent(),
                 Value<IntakeStatus> status = const Value.absent(),
@@ -5672,6 +5757,7 @@ class $$IntakeLogsTableTableManager
                 id: id,
                 medicationId: medicationId,
                 scheduleId: scheduleId,
+                medNameSnapshot: medNameSnapshot,
                 scheduledAt: scheduledAt,
                 actedAt: actedAt,
                 status: status,
@@ -5683,8 +5769,9 @@ class $$IntakeLogsTableTableManager
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
-                required int medicationId,
-                required int scheduleId,
+                Value<int?> medicationId = const Value.absent(),
+                Value<int?> scheduleId = const Value.absent(),
+                Value<String?> medNameSnapshot = const Value.absent(),
                 required DateTime scheduledAt,
                 Value<DateTime?> actedAt = const Value.absent(),
                 Value<IntakeStatus> status = const Value.absent(),
@@ -5696,6 +5783,7 @@ class $$IntakeLogsTableTableManager
                 id: id,
                 medicationId: medicationId,
                 scheduleId: scheduleId,
+                medNameSnapshot: medNameSnapshot,
                 scheduledAt: scheduledAt,
                 actedAt: actedAt,
                 status: status,

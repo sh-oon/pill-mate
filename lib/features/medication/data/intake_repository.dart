@@ -84,8 +84,8 @@ class IntakeRepository {
     if (existing == null) {
       await _db.into(_db.intakeLogs).insert(
             IntakeLogsCompanion.insert(
-              medicationId: medicationId,
-              scheduleId: scheduleId,
+              medicationId: Value(medicationId),
+              scheduleId: Value(scheduleId),
               scheduledAt: scheduledAt,
               status: Value(status),
               actedAt: Value(now),

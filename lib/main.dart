@@ -12,6 +12,7 @@ import 'core/notifications/notification_service.dart';
 import 'core/notifications/pending_action_flusher.dart';
 import 'core/router/app_router.dart';
 import 'core/storage/onboarding_storage.dart';
+import 'features/medication/data/medication_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,7 +38,13 @@ Future<void> main() async {
   final pendingDeepLink = await _resolveColdStartDeepLink(container);
   unawaited(() async {
     await PendingActionFlusher(container).flushAll();
+    // legacy 중복 schedules 정리 (same medicationId + timeOfDay)
+    // — syncAll 보다 먼저 해서 정리된 schedules로 알림 동기화.
+    final repo = container.read(trackedMedicationRepositoryProvider);
+    await repo.cleanupDuplicateSchedules();
     await container.read(medicationNotificationManagerProvider).syncAll();
+    // 과거 dedupe 도입 전 누적된 user catalog 중복 / relink 부산물 정리.
+    await repo.cleanupOrphanUserCatalogs();
   }());
 
   runApp(
