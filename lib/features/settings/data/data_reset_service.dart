@@ -18,7 +18,7 @@ class DataResetService {
       await _db.delete(_db.intakeLogs).go();
       await _db.delete(_db.intervalOccurrences).go();
       await _db.delete(_db.schedules).go();
-      await _db.delete(_db.medications).go();
+      await _db.delete(_db.trackedMedications).go();
     });
   }
 }

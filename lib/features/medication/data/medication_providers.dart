@@ -4,21 +4,21 @@ import '../../../core/database/database_providers.dart';
 import '../../../core/notifications/medication_notification_manager.dart';
 import 'medication_repository.dart';
 
-final medicationRepositoryProvider = Provider<MedicationRepository>((ref) {
-  return MedicationRepository(
+final trackedMedicationRepositoryProvider = Provider<TrackedMedicationRepository>((ref) {
+  return TrackedMedicationRepository(
     ref.watch(appDatabaseProvider),
     ref.watch(medicationNotificationManagerProvider),
   );
 });
 
 /// 활성 약 + 스케줄 전체 실시간 스트림.
-final medicationsStreamProvider =
-    StreamProvider<List<MedicationWithSchedules>>((ref) {
-  return ref.watch(medicationRepositoryProvider).watchAll();
+final trackedMedicationsStreamProvider =
+    StreamProvider<List<TrackedMedicationWithSchedules>>((ref) {
+  return ref.watch(trackedMedicationRepositoryProvider).watchAll();
 });
 
 /// id 별 단일 약 스트림.
-final medicationByIdProvider =
-    StreamProvider.family<MedicationWithSchedules?, int>((ref, id) {
-  return ref.watch(medicationRepositoryProvider).watchById(id);
+final trackedMedicationByIdProvider =
+    StreamProvider.family<TrackedMedicationWithSchedules?, int>((ref, id) {
+  return ref.watch(trackedMedicationRepositoryProvider).watchById(id);
 });

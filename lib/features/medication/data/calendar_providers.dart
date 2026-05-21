@@ -9,7 +9,7 @@ import 'medication_providers.dart';
 final dayDosesProvider =
     FutureProvider.family<List<DoseInstance>, DateTime>((ref, date) async {
   final repo = ref.watch(intakeRepositoryProvider);
-  final medsAsync = ref.watch(medicationsStreamProvider);
+  final medsAsync = ref.watch(trackedMedicationsStreamProvider);
 
   return medsAsync.when(
     loading: () async => <DoseInstance>[],
@@ -75,7 +75,7 @@ final calendarJumpDateProvider =
 final monthMarksProvider = FutureProvider.family
     .autoDispose<Map<int, DayMarkKind>, ({int year, int month})>((ref, key) async {
   final repo = ref.watch(intakeRepositoryProvider);
-  final medsAsync = ref.watch(medicationsStreamProvider);
+  final medsAsync = ref.watch(trackedMedicationsStreamProvider);
 
   return medsAsync.when(
     loading: () async => <int, DayMarkKind>{},

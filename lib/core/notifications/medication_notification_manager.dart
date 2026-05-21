@@ -32,7 +32,7 @@ class MedicationNotificationManager {
 
   /// 한 약의 활성 schedule 전부를 시스템에 재반영.
   Future<void> syncSchedulesFor(int medicationId) async {
-    final med = await (_db.select(_db.medications)
+    final med = await (_db.select(_db.trackedMedications)
           ..where((m) => m.id.equals(medicationId)))
         .getSingleOrNull();
     if (med == null) {
@@ -70,7 +70,7 @@ class MedicationNotificationManager {
   /// 앱 부팅/업데이트 시 전체 재구성.
   Future<void> syncAll() async {
     await _plugin.cancelAll();
-    final meds = await _db.select(_db.medications).get();
+    final meds = await _db.select(_db.trackedMedications).get();
     for (final m in meds.where((x) => !x.archived)) {
       await syncSchedulesFor(m.id);
     }
@@ -81,7 +81,7 @@ class MedicationNotificationManager {
   // ==========================================================================
 
   Future<void> _scheduleRecurring({
-    required Medication med,
+    required TrackedMedication med,
     required Schedule schedule,
   }) async {
     switch (schedule.repeatKind) {
@@ -97,7 +97,7 @@ class MedicationNotificationManager {
     }
   }
 
-  Future<void> _scheduleDaily(Medication med, Schedule s) async {
+  Future<void> _scheduleDaily(TrackedMedication med, Schedule s) async {
     final next = _nextOccurrence(s.timeOfDay);
 
     // 1) N분 전 사전 알림 (daily 반복).
@@ -158,7 +158,7 @@ class MedicationNotificationManager {
 
   static const int defaultUrgentMaxRepeats = 6;
 
-  Future<void> _scheduleWeekly(Medication med, Schedule s) async {
+  Future<void> _scheduleWeekly(TrackedMedication med, Schedule s) async {
     final mask = s.daysOfWeekMask ?? 0;
     // 비트 0=일요일 ... 비트 6=토요일.
     for (var bit = 0; bit < 7; bit++) {
@@ -184,7 +184,7 @@ class MedicationNotificationManager {
   /// 이미 큐에 있는 occurrence는 재사용. 사용자 액션 후 또는 부팅 시 재호출되어
   /// 큐 길이 유지.
   Future<void> _scheduleInterval(
-    Medication med,
+    TrackedMedication med,
     Schedule s, {
     int target = 7,
   }) async {
@@ -296,7 +296,7 @@ class MedicationNotificationManager {
     Duration delay = const Duration(minutes: 10),
   }) async {
     await _plugin.cancel(_snoozeIdForSched(scheduleId));
-    final med = await (_db.select(_db.medications)
+    final med = await (_db.select(_db.trackedMedications)
           ..where((m) => m.id.equals(medicationId)))
         .getSingleOrNull();
     if (med == null || med.archived) return;
@@ -427,7 +427,7 @@ class MedicationNotificationManager {
     return NotificationDetails(android: android, iOS: ios);
   }
 
-  String _quantityHint(Medication m) {
+  String _quantityHint(TrackedMedication m) {
     final d = m.dosage, u = m.unit;
     if (d != null && u != null) return '$d$u — 복용 후 체크해주세요';
     if (d != null) return '$d — 복용 후 체크해주세요';

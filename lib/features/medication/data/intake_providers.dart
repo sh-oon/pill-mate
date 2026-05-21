@@ -21,7 +21,7 @@ final todayLogsProvider = StreamProvider<List<IntakeLog>>((ref) {
 
 /// 오늘의 dose 계산 — meds(스케줄 포함) + logs를 결합.
 final todayDosesProvider = Provider<AsyncValue<List<DoseInstance>>>((ref) {
-  final medsAsync = ref.watch(medicationsStreamProvider);
+  final medsAsync = ref.watch(trackedMedicationsStreamProvider);
   final logsAsync = ref.watch(todayLogsProvider);
 
   return medsAsync.when(

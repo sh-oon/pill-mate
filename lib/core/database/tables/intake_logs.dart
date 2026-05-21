@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
-import 'medications.dart';
 import 'schedules.dart';
+import 'tracked_medications.dart';
 
 /// 복용 상태
 /// - pending: 예정 (아직 시각 도래 전)
@@ -13,8 +13,9 @@ enum IntakeStatus { pending, taken, skipped, missed }
 class IntakeLogs extends Table {
   IntColumn get id => integer().autoIncrement()();
 
+  /// FK → tracked_medications.id. 변수명은 호환성 위해 medicationId 유지.
   IntColumn get medicationId =>
-      integer().references(Medications, #id, onDelete: KeyAction.cascade)();
+      integer().references(TrackedMedications, #id, onDelete: KeyAction.cascade)();
   IntColumn get scheduleId =>
       integer().references(Schedules, #id, onDelete: KeyAction.cascade)();
 

@@ -45,7 +45,7 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
 
   Future<void> _prefillFromExisting() async {
     final m = await ref
-        .read(medicationRepositoryProvider)
+        .read(trackedMedicationRepositoryProvider)
         .getById(widget.medicationId!);
     if (m == null || !mounted) return;
     setState(() {
@@ -84,8 +84,8 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
   Future<void> _finish() async {
     if (_saving) return;
     setState(() => _saving = true);
-    final repo = ref.read(medicationRepositoryProvider);
-    final draft = MedicationDraft(
+    final repo = ref.read(trackedMedicationRepositoryProvider);
+    final draft = TrackedMedicationDraft(
       name: _name.trim(),
       category: _category!,
       times: _times,
@@ -105,9 +105,9 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
       // 명시적 invalidate — stream re-emit이 timing 이슈로 누락되거나
       // 늦게 도착할 때 UI가 stale 데이터를 보여주는 케이스 방어.
       ref.invalidate(todayLogsProvider);
-      ref.invalidate(medicationsStreamProvider);
+      ref.invalidate(trackedMedicationsStreamProvider);
       if (_isEdit) {
-        ref.invalidate(medicationByIdProvider(widget.medicationId!));
+        ref.invalidate(trackedMedicationByIdProvider(widget.medicationId!));
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
