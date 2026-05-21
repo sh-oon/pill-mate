@@ -80,6 +80,7 @@ void main() {
       // 홈 화면 노출
       expect(find.text('오늘 복용'), findsOneWidget);
     },
-    skip: 'TODO: requires drift in-memory provider override',
+    // TODO: requires drift in-memory provider override harness.
+    skip: true,
   );
 }
