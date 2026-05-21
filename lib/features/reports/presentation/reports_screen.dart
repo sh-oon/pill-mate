@@ -66,6 +66,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 context,
                 time: '',
                 meds: const [],
+                onMarkTaken: (_) async {},
               ),
               onSettingsTap: () => context.push(AppRoute.settings),
             ),

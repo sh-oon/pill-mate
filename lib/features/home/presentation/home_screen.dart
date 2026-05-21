@@ -166,7 +166,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     final bundle = doses
         .where((d) => d.scheduledAt == targetTime)
-        .map((d) => BundleMed(name: d.medicationName, quantity: d.quantityLabel))
+        .map((d) => BundleMed(
+              name: d.medicationName,
+              quantity: d.quantityLabel,
+              scheduleId: d.scheduleId,
+              medicationId: d.medicationId,
+              scheduledAt: d.scheduledAt,
+              alreadyTaken: d.status == IntakeStatus.taken,
+            ))
         .toList();
 
     await BundleNotificationSheet.show(
@@ -175,6 +182,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ? ''
           : '${targetTime.hour.toString().padLeft(2, '0')}:${targetTime.minute.toString().padLeft(2, '0')}',
       meds: bundle,
+      onMarkTaken: (selected) async {
+        final repo = ref.read(intakeRepositoryProvider);
+        for (final m in selected) {
+          await repo.markTaken(
+            medicationId: m.medicationId,
+            scheduleId: m.scheduleId,
+            scheduledAt: m.scheduledAt,
+          );
+        }
+      },
     );
   }
 

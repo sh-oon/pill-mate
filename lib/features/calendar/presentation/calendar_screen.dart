@@ -142,6 +142,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 context,
                 time: '',
                 meds: const [],
+                onMarkTaken: (_) async {},
               ),
               onSettingsTap: () => context.push(AppRoute.settings),
             ),

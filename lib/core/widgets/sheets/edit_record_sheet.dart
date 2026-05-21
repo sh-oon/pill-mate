@@ -98,7 +98,7 @@ class EditRecordSheet extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: AppButton(
-                    label: '먹었던 걸로',
+                    label: '이미 복용했어요',
                     fullWidth: true,
                     onPressed: () => Navigator.of(context)
                         .pop(EditRecordChoice.markTaken),

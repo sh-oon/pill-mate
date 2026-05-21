@@ -7,7 +7,6 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_buttons.dart';
 import '../../../core/widgets/category_chip.dart';
-import '../../../core/widgets/dialogs/confirm_action_dialog.dart';
 import '../../../core/widgets/filter_pill.dart';
 import '../../../core/widgets/pill_icon.dart';
 import '../../../core/widgets/pill_toggle_switch.dart';
@@ -145,11 +144,6 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
                 for (final m in filtered)
                   _SwipeToDelete(
                     id: m.medication.id,
-                    onConfirm: () => ConfirmActionDialog.show(
-                      context,
-                      title: '${m.medication.name} 삭제',
-                      message: '이 약과 모든 복용 기록이\n함께 삭제됩니다. 되돌릴 수 없어요.',
-                    ),
                     onDismissed: () async {
                       await ref
                           .read(trackedMedicationRepositoryProvider)
@@ -157,7 +151,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('${m.medication.name} 삭제됨'),
+                          content: Text('${m.medication.name}알람을 제거했어요.'),
                         ),
                       );
                     },
@@ -564,13 +558,11 @@ class _SwipeToDelete extends StatefulWidget {
   const _SwipeToDelete({
     required this.id,
     required this.child,
-    required this.onConfirm,
     required this.onDismissed,
   });
 
   final int id;
   final Widget child;
-  final Future<bool> Function() onConfirm;
   final VoidCallback onDismissed;
 
   @override
@@ -587,15 +579,6 @@ class _SwipeToDeleteState extends State<_SwipeToDelete>
     super.dispose();
   }
 
-  Future<void> _handleDelete() async {
-    final ok = await widget.onConfirm();
-    if (ok) {
-      widget.onDismissed();
-    } else {
-      await _slc.close();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -609,17 +592,14 @@ class _SwipeToDeleteState extends State<_SwipeToDelete>
           endActionPane: ActionPane(
             motion: const BehindMotion(),
             extentRatio: 0.24,
+            // confirm 없이 즉시 삭제 — full swipe = dismiss, tap delete =
+            // 동일 onDismissed. snackbar로 사용자에게 알림.
             dismissible: DismissiblePane(
-              confirmDismiss: () async {
-                final ok = await widget.onConfirm();
-                if (!ok) await _slc.close();
-                return ok;
-              },
               onDismissed: widget.onDismissed,
             ),
             children: [
               SlidableAction(
-                onPressed: (_) => _handleDelete(),
+                onPressed: (_) => widget.onDismissed(),
                 backgroundColor: AppColors.missed,
                 foregroundColor: Colors.white,
                 icon: Icons.delete_outline,

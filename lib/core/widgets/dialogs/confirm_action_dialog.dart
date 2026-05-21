@@ -22,27 +22,32 @@ class ConfirmActionDialog {
     bool destructive = true,
   }) async {
     final tone = destructive ? AppDialogTone.danger : AppDialogTone.primary;
+    // Builder로 dialog 내부 context를 캡처 — 외부 caller context의 element가
+    // dispose된 뒤(예: Slidable confirmDismiss 도중) Navigator.of가 터지는
+    // 케이스 방어.
     final ok = await AppDialog.show<bool>(
       context,
-      child: AppDialog(
-        children: [
-          AppDialogIconBadge(
-            icon: icon,
-            tone: tone,
-            size: 56,
-            iconSize: 28,
-            shape: BoxShape.circle,
-          ),
-          AppDialogTitle(title),
-          AppDialogMessage(message),
-          AppDialogActionPair(
-            cancelLabel: cancelLabel,
-            confirmLabel: confirmLabel,
-            destructive: destructive,
-            onCancel: () => Navigator.of(context).pop<bool>(false),
-            onConfirm: () => Navigator.of(context).pop<bool>(true),
-          ),
-        ],
+      child: Builder(
+        builder: (dialogCtx) => AppDialog(
+          children: [
+            AppDialogIconBadge(
+              icon: icon,
+              tone: tone,
+              size: 56,
+              iconSize: 28,
+              shape: BoxShape.circle,
+            ),
+            AppDialogTitle(title),
+            AppDialogMessage(message),
+            AppDialogActionPair(
+              cancelLabel: cancelLabel,
+              confirmLabel: confirmLabel,
+              destructive: destructive,
+              onCancel: () => Navigator.of(dialogCtx).pop<bool>(false),
+              onConfirm: () => Navigator.of(dialogCtx).pop<bool>(true),
+            ),
+          ],
+        ),
       ),
     );
     return ok ?? false;
