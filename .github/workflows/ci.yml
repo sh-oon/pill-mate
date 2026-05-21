@@ -40,6 +40,9 @@ jobs:
       # not yet `dart format` clean. Will be enabled after a one-shot
       # `chore(style): apply dart format` PR. Tracked separately.
 
+      - name: Validate seed catalog
+        run: dart run tool/validate_seed_catalog.dart
+
       - name: Analyze
         run: flutter analyze --fatal-warnings
 
