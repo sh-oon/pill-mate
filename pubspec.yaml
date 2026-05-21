@@ -57,6 +57,7 @@ dependencies:
   # Utils
   intl: ^0.20.1
   collection: ^1.18.0
+  uuid: ^4.5.1
 
 dev_dependencies:
   flutter_test:
@@ -79,6 +80,7 @@ flutter:
 
   assets:
     - assets/onboarding/
+    - assets/seed/
 
   fonts:
     - family: Pretendard
