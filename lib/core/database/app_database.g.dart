@@ -3,6 +3,762 @@
 part of 'app_database.dart';
 
 // ignore_for_file: type=lint
+class $CatalogItemsTable extends CatalogItems
+    with TableInfo<$CatalogItemsTable, CatalogItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CatalogItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 80,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameEnMeta = const VerificationMeta('nameEn');
+  @override
+  late final GeneratedColumn<String> nameEn = GeneratedColumn<String>(
+    'name_en',
+    aliasedName,
+    true,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 80),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 8),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _defaultDosageMeta = const VerificationMeta(
+    'defaultDosage',
+  );
+  @override
+  late final GeneratedColumn<String> defaultDosage = GeneratedColumn<String>(
+    'default_dosage',
+    aliasedName,
+    true,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 40),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _defaultUnitMeta = const VerificationMeta(
+    'defaultUnit',
+  );
+  @override
+  late final GeneratedColumn<String> defaultUnit = GeneratedColumn<String>(
+    'default_unit',
+    aliasedName,
+    true,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 20),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _shapeMeta = const VerificationMeta('shape');
+  @override
+  late final GeneratedColumn<String> shape = GeneratedColumn<String>(
+    'shape',
+    aliasedName,
+    true,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 20),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _colorHexMeta = const VerificationMeta(
+    'colorHex',
+  );
+  @override
+  late final GeneratedColumn<String> colorHex = GeneratedColumn<String>(
+    'color_hex',
+    aliasedName,
+    true,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 7,
+      maxTextLength: 9,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _iconKeyMeta = const VerificationMeta(
+    'iconKey',
+  );
+  @override
+  late final GeneratedColumn<String> iconKey = GeneratedColumn<String>(
+    'icon_key',
+    aliasedName,
+    true,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 40),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _tagsJsonMeta = const VerificationMeta(
+    'tagsJson',
+  );
+  @override
+  late final GeneratedColumn<String> tagsJson = GeneratedColumn<String>(
+    'tags_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<CatalogSource, int> source =
+      GeneratedColumn<int>(
+        'source',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: Constant(CatalogSource.user.index),
+      ).withConverter<CatalogSource>($CatalogItemsTable.$convertersource);
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    nameEn,
+    category,
+    defaultDosage,
+    defaultUnit,
+    shape,
+    colorHex,
+    iconKey,
+    tagsJson,
+    source,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'catalog_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CatalogItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('name_en')) {
+      context.handle(
+        _nameEnMeta,
+        nameEn.isAcceptableOrUnknown(data['name_en']!, _nameEnMeta),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_categoryMeta);
+    }
+    if (data.containsKey('default_dosage')) {
+      context.handle(
+        _defaultDosageMeta,
+        defaultDosage.isAcceptableOrUnknown(
+          data['default_dosage']!,
+          _defaultDosageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('default_unit')) {
+      context.handle(
+        _defaultUnitMeta,
+        defaultUnit.isAcceptableOrUnknown(
+          data['default_unit']!,
+          _defaultUnitMeta,
+        ),
+      );
+    }
+    if (data.containsKey('shape')) {
+      context.handle(
+        _shapeMeta,
+        shape.isAcceptableOrUnknown(data['shape']!, _shapeMeta),
+      );
+    }
+    if (data.containsKey('color_hex')) {
+      context.handle(
+        _colorHexMeta,
+        colorHex.isAcceptableOrUnknown(data['color_hex']!, _colorHexMeta),
+      );
+    }
+    if (data.containsKey('icon_key')) {
+      context.handle(
+        _iconKeyMeta,
+        iconKey.isAcceptableOrUnknown(data['icon_key']!, _iconKeyMeta),
+      );
+    }
+    if (data.containsKey('tags_json')) {
+      context.handle(
+        _tagsJsonMeta,
+        tagsJson.isAcceptableOrUnknown(data['tags_json']!, _tagsJsonMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CatalogItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CatalogItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      nameEn: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name_en'],
+      ),
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      defaultDosage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_dosage'],
+      ),
+      defaultUnit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_unit'],
+      ),
+      shape: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shape'],
+      ),
+      colorHex: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color_hex'],
+      ),
+      iconKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon_key'],
+      ),
+      tagsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags_json'],
+      ),
+      source: $CatalogItemsTable.$convertersource.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}source'],
+        )!,
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CatalogItemsTable createAlias(String alias) {
+    return $CatalogItemsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<CatalogSource, int, int> $convertersource =
+      const EnumIndexConverter<CatalogSource>(CatalogSource.values);
+}
+
+class CatalogItem extends DataClass implements Insertable<CatalogItem> {
+  /// 슬러그 또는 UUID. 예: 'vit-d3-1000iu', 'a1b2c3d4-...'
+  /// TEXT primary key — INT autoinc가 아닌 이유: 시드 안정성 (앱 업데이트 시
+  /// 행 번호 재할당 무관, 외부 참조 안전).
+  final String id;
+  final String name;
+  final String? nameEn;
+
+  /// 'med' (약) | 'sup' (영양제). 기존 medications.category와 동일 enum.
+  final String category;
+
+  /// 기본 용량 표기. 시드 큐레이션 값. 사용자 인스턴스에서 override 가능 (Phase 2).
+  final String? defaultDosage;
+  final String? defaultUnit;
+
+  /// 형태. 'tablet' | 'capsule' | 'softgel' | 'powder' | 'liquid' | 'gummy' | 'sachet'
+  final String? shape;
+
+  /// 표시 색상. #RRGGBB 또는 #AARRGGBB.
+  final String? colorHex;
+
+  /// 아이콘 키. 'pill' | 'capsule' | 'tablet' | 'softgel' | 'powder' | 'liquid'
+  final String? iconKey;
+
+  /// JSON-encoded `List<String>`. 예: '["면역","뼈건강"]'.
+  /// SQLite는 TEXT로 저장, 앱에서 jsonDecode/jsonEncode.
+  final String? tagsJson;
+
+  /// CatalogSource enum index.
+  final CatalogSource source;
+  final DateTime createdAt;
+  const CatalogItem({
+    required this.id,
+    required this.name,
+    this.nameEn,
+    required this.category,
+    this.defaultDosage,
+    this.defaultUnit,
+    this.shape,
+    this.colorHex,
+    this.iconKey,
+    this.tagsJson,
+    required this.source,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || nameEn != null) {
+      map['name_en'] = Variable<String>(nameEn);
+    }
+    map['category'] = Variable<String>(category);
+    if (!nullToAbsent || defaultDosage != null) {
+      map['default_dosage'] = Variable<String>(defaultDosage);
+    }
+    if (!nullToAbsent || defaultUnit != null) {
+      map['default_unit'] = Variable<String>(defaultUnit);
+    }
+    if (!nullToAbsent || shape != null) {
+      map['shape'] = Variable<String>(shape);
+    }
+    if (!nullToAbsent || colorHex != null) {
+      map['color_hex'] = Variable<String>(colorHex);
+    }
+    if (!nullToAbsent || iconKey != null) {
+      map['icon_key'] = Variable<String>(iconKey);
+    }
+    if (!nullToAbsent || tagsJson != null) {
+      map['tags_json'] = Variable<String>(tagsJson);
+    }
+    {
+      map['source'] = Variable<int>(
+        $CatalogItemsTable.$convertersource.toSql(source),
+      );
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  CatalogItemsCompanion toCompanion(bool nullToAbsent) {
+    return CatalogItemsCompanion(
+      id: Value(id),
+      name: Value(name),
+      nameEn: nameEn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nameEn),
+      category: Value(category),
+      defaultDosage: defaultDosage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(defaultDosage),
+      defaultUnit: defaultUnit == null && nullToAbsent
+          ? const Value.absent()
+          : Value(defaultUnit),
+      shape: shape == null && nullToAbsent
+          ? const Value.absent()
+          : Value(shape),
+      colorHex: colorHex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(colorHex),
+      iconKey: iconKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(iconKey),
+      tagsJson: tagsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(tagsJson),
+      source: Value(source),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory CatalogItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CatalogItem(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      nameEn: serializer.fromJson<String?>(json['nameEn']),
+      category: serializer.fromJson<String>(json['category']),
+      defaultDosage: serializer.fromJson<String?>(json['defaultDosage']),
+      defaultUnit: serializer.fromJson<String?>(json['defaultUnit']),
+      shape: serializer.fromJson<String?>(json['shape']),
+      colorHex: serializer.fromJson<String?>(json['colorHex']),
+      iconKey: serializer.fromJson<String?>(json['iconKey']),
+      tagsJson: serializer.fromJson<String?>(json['tagsJson']),
+      source: $CatalogItemsTable.$convertersource.fromJson(
+        serializer.fromJson<int>(json['source']),
+      ),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'nameEn': serializer.toJson<String?>(nameEn),
+      'category': serializer.toJson<String>(category),
+      'defaultDosage': serializer.toJson<String?>(defaultDosage),
+      'defaultUnit': serializer.toJson<String?>(defaultUnit),
+      'shape': serializer.toJson<String?>(shape),
+      'colorHex': serializer.toJson<String?>(colorHex),
+      'iconKey': serializer.toJson<String?>(iconKey),
+      'tagsJson': serializer.toJson<String?>(tagsJson),
+      'source': serializer.toJson<int>(
+        $CatalogItemsTable.$convertersource.toJson(source),
+      ),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  CatalogItem copyWith({
+    String? id,
+    String? name,
+    Value<String?> nameEn = const Value.absent(),
+    String? category,
+    Value<String?> defaultDosage = const Value.absent(),
+    Value<String?> defaultUnit = const Value.absent(),
+    Value<String?> shape = const Value.absent(),
+    Value<String?> colorHex = const Value.absent(),
+    Value<String?> iconKey = const Value.absent(),
+    Value<String?> tagsJson = const Value.absent(),
+    CatalogSource? source,
+    DateTime? createdAt,
+  }) => CatalogItem(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    nameEn: nameEn.present ? nameEn.value : this.nameEn,
+    category: category ?? this.category,
+    defaultDosage: defaultDosage.present
+        ? defaultDosage.value
+        : this.defaultDosage,
+    defaultUnit: defaultUnit.present ? defaultUnit.value : this.defaultUnit,
+    shape: shape.present ? shape.value : this.shape,
+    colorHex: colorHex.present ? colorHex.value : this.colorHex,
+    iconKey: iconKey.present ? iconKey.value : this.iconKey,
+    tagsJson: tagsJson.present ? tagsJson.value : this.tagsJson,
+    source: source ?? this.source,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  CatalogItem copyWithCompanion(CatalogItemsCompanion data) {
+    return CatalogItem(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      nameEn: data.nameEn.present ? data.nameEn.value : this.nameEn,
+      category: data.category.present ? data.category.value : this.category,
+      defaultDosage: data.defaultDosage.present
+          ? data.defaultDosage.value
+          : this.defaultDosage,
+      defaultUnit: data.defaultUnit.present
+          ? data.defaultUnit.value
+          : this.defaultUnit,
+      shape: data.shape.present ? data.shape.value : this.shape,
+      colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
+      iconKey: data.iconKey.present ? data.iconKey.value : this.iconKey,
+      tagsJson: data.tagsJson.present ? data.tagsJson.value : this.tagsJson,
+      source: data.source.present ? data.source.value : this.source,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CatalogItem(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('nameEn: $nameEn, ')
+          ..write('category: $category, ')
+          ..write('defaultDosage: $defaultDosage, ')
+          ..write('defaultUnit: $defaultUnit, ')
+          ..write('shape: $shape, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('iconKey: $iconKey, ')
+          ..write('tagsJson: $tagsJson, ')
+          ..write('source: $source, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    nameEn,
+    category,
+    defaultDosage,
+    defaultUnit,
+    shape,
+    colorHex,
+    iconKey,
+    tagsJson,
+    source,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CatalogItem &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.nameEn == this.nameEn &&
+          other.category == this.category &&
+          other.defaultDosage == this.defaultDosage &&
+          other.defaultUnit == this.defaultUnit &&
+          other.shape == this.shape &&
+          other.colorHex == this.colorHex &&
+          other.iconKey == this.iconKey &&
+          other.tagsJson == this.tagsJson &&
+          other.source == this.source &&
+          other.createdAt == this.createdAt);
+}
+
+class CatalogItemsCompanion extends UpdateCompanion<CatalogItem> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> nameEn;
+  final Value<String> category;
+  final Value<String?> defaultDosage;
+  final Value<String?> defaultUnit;
+  final Value<String?> shape;
+  final Value<String?> colorHex;
+  final Value<String?> iconKey;
+  final Value<String?> tagsJson;
+  final Value<CatalogSource> source;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const CatalogItemsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.nameEn = const Value.absent(),
+    this.category = const Value.absent(),
+    this.defaultDosage = const Value.absent(),
+    this.defaultUnit = const Value.absent(),
+    this.shape = const Value.absent(),
+    this.colorHex = const Value.absent(),
+    this.iconKey = const Value.absent(),
+    this.tagsJson = const Value.absent(),
+    this.source = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CatalogItemsCompanion.insert({
+    required String id,
+    required String name,
+    this.nameEn = const Value.absent(),
+    required String category,
+    this.defaultDosage = const Value.absent(),
+    this.defaultUnit = const Value.absent(),
+    this.shape = const Value.absent(),
+    this.colorHex = const Value.absent(),
+    this.iconKey = const Value.absent(),
+    this.tagsJson = const Value.absent(),
+    this.source = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       category = Value(category);
+  static Insertable<CatalogItem> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? nameEn,
+    Expression<String>? category,
+    Expression<String>? defaultDosage,
+    Expression<String>? defaultUnit,
+    Expression<String>? shape,
+    Expression<String>? colorHex,
+    Expression<String>? iconKey,
+    Expression<String>? tagsJson,
+    Expression<int>? source,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (nameEn != null) 'name_en': nameEn,
+      if (category != null) 'category': category,
+      if (defaultDosage != null) 'default_dosage': defaultDosage,
+      if (defaultUnit != null) 'default_unit': defaultUnit,
+      if (shape != null) 'shape': shape,
+      if (colorHex != null) 'color_hex': colorHex,
+      if (iconKey != null) 'icon_key': iconKey,
+      if (tagsJson != null) 'tags_json': tagsJson,
+      if (source != null) 'source': source,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CatalogItemsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? nameEn,
+    Value<String>? category,
+    Value<String?>? defaultDosage,
+    Value<String?>? defaultUnit,
+    Value<String?>? shape,
+    Value<String?>? colorHex,
+    Value<String?>? iconKey,
+    Value<String?>? tagsJson,
+    Value<CatalogSource>? source,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return CatalogItemsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      nameEn: nameEn ?? this.nameEn,
+      category: category ?? this.category,
+      defaultDosage: defaultDosage ?? this.defaultDosage,
+      defaultUnit: defaultUnit ?? this.defaultUnit,
+      shape: shape ?? this.shape,
+      colorHex: colorHex ?? this.colorHex,
+      iconKey: iconKey ?? this.iconKey,
+      tagsJson: tagsJson ?? this.tagsJson,
+      source: source ?? this.source,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (nameEn.present) {
+      map['name_en'] = Variable<String>(nameEn.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (defaultDosage.present) {
+      map['default_dosage'] = Variable<String>(defaultDosage.value);
+    }
+    if (defaultUnit.present) {
+      map['default_unit'] = Variable<String>(defaultUnit.value);
+    }
+    if (shape.present) {
+      map['shape'] = Variable<String>(shape.value);
+    }
+    if (colorHex.present) {
+      map['color_hex'] = Variable<String>(colorHex.value);
+    }
+    if (iconKey.present) {
+      map['icon_key'] = Variable<String>(iconKey.value);
+    }
+    if (tagsJson.present) {
+      map['tags_json'] = Variable<String>(tagsJson.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<int>(
+        $CatalogItemsTable.$convertersource.toSql(source.value),
+      );
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CatalogItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('nameEn: $nameEn, ')
+          ..write('category: $category, ')
+          ..write('defaultDosage: $defaultDosage, ')
+          ..write('defaultUnit: $defaultUnit, ')
+          ..write('shape: $shape, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('iconKey: $iconKey, ')
+          ..write('tagsJson: $tagsJson, ')
+          ..write('source: $source, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $MedicationsTable extends Medications
     with TableInfo<$MedicationsTable, Medication> {
   @override
@@ -2555,6 +3311,7 @@ class IntervalOccurrencesCompanion extends UpdateCompanion<IntervalOccurrence> {
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final $CatalogItemsTable catalogItems = $CatalogItemsTable(this);
   late final $MedicationsTable medications = $MedicationsTable(this);
   late final $SchedulesTable schedules = $SchedulesTable(this);
   late final $IntakeLogsTable intakeLogs = $IntakeLogsTable(this);
@@ -2565,6 +3322,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    catalogItems,
     medications,
     schedules,
     intakeLogs,
@@ -2603,6 +3361,344 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   ]);
 }
 
+typedef $$CatalogItemsTableCreateCompanionBuilder =
+    CatalogItemsCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> nameEn,
+      required String category,
+      Value<String?> defaultDosage,
+      Value<String?> defaultUnit,
+      Value<String?> shape,
+      Value<String?> colorHex,
+      Value<String?> iconKey,
+      Value<String?> tagsJson,
+      Value<CatalogSource> source,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$CatalogItemsTableUpdateCompanionBuilder =
+    CatalogItemsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> nameEn,
+      Value<String> category,
+      Value<String?> defaultDosage,
+      Value<String?> defaultUnit,
+      Value<String?> shape,
+      Value<String?> colorHex,
+      Value<String?> iconKey,
+      Value<String?> tagsJson,
+      Value<CatalogSource> source,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+class $$CatalogItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $CatalogItemsTable> {
+  $$CatalogItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nameEn => $composableBuilder(
+    column: $table.nameEn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get defaultDosage => $composableBuilder(
+    column: $table.defaultDosage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get defaultUnit => $composableBuilder(
+    column: $table.defaultUnit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get shape => $composableBuilder(
+    column: $table.shape,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iconKey => $composableBuilder(
+    column: $table.iconKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tagsJson => $composableBuilder(
+    column: $table.tagsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<CatalogSource, CatalogSource, int>
+  get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CatalogItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CatalogItemsTable> {
+  $$CatalogItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nameEn => $composableBuilder(
+    column: $table.nameEn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get defaultDosage => $composableBuilder(
+    column: $table.defaultDosage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get defaultUnit => $composableBuilder(
+    column: $table.defaultUnit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get shape => $composableBuilder(
+    column: $table.shape,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get iconKey => $composableBuilder(
+    column: $table.iconKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tagsJson => $composableBuilder(
+    column: $table.tagsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CatalogItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CatalogItemsTable> {
+  $$CatalogItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get nameEn =>
+      $composableBuilder(column: $table.nameEn, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get defaultDosage => $composableBuilder(
+    column: $table.defaultDosage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get defaultUnit => $composableBuilder(
+    column: $table.defaultUnit,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get shape =>
+      $composableBuilder(column: $table.shape, builder: (column) => column);
+
+  GeneratedColumn<String> get colorHex =>
+      $composableBuilder(column: $table.colorHex, builder: (column) => column);
+
+  GeneratedColumn<String> get iconKey =>
+      $composableBuilder(column: $table.iconKey, builder: (column) => column);
+
+  GeneratedColumn<String> get tagsJson =>
+      $composableBuilder(column: $table.tagsJson, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<CatalogSource, int> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$CatalogItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CatalogItemsTable,
+          CatalogItem,
+          $$CatalogItemsTableFilterComposer,
+          $$CatalogItemsTableOrderingComposer,
+          $$CatalogItemsTableAnnotationComposer,
+          $$CatalogItemsTableCreateCompanionBuilder,
+          $$CatalogItemsTableUpdateCompanionBuilder,
+          (
+            CatalogItem,
+            BaseReferences<_$AppDatabase, $CatalogItemsTable, CatalogItem>,
+          ),
+          CatalogItem,
+          PrefetchHooks Function()
+        > {
+  $$CatalogItemsTableTableManager(_$AppDatabase db, $CatalogItemsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CatalogItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CatalogItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CatalogItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> nameEn = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<String?> defaultDosage = const Value.absent(),
+                Value<String?> defaultUnit = const Value.absent(),
+                Value<String?> shape = const Value.absent(),
+                Value<String?> colorHex = const Value.absent(),
+                Value<String?> iconKey = const Value.absent(),
+                Value<String?> tagsJson = const Value.absent(),
+                Value<CatalogSource> source = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CatalogItemsCompanion(
+                id: id,
+                name: name,
+                nameEn: nameEn,
+                category: category,
+                defaultDosage: defaultDosage,
+                defaultUnit: defaultUnit,
+                shape: shape,
+                colorHex: colorHex,
+                iconKey: iconKey,
+                tagsJson: tagsJson,
+                source: source,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> nameEn = const Value.absent(),
+                required String category,
+                Value<String?> defaultDosage = const Value.absent(),
+                Value<String?> defaultUnit = const Value.absent(),
+                Value<String?> shape = const Value.absent(),
+                Value<String?> colorHex = const Value.absent(),
+                Value<String?> iconKey = const Value.absent(),
+                Value<String?> tagsJson = const Value.absent(),
+                Value<CatalogSource> source = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CatalogItemsCompanion.insert(
+                id: id,
+                name: name,
+                nameEn: nameEn,
+                category: category,
+                defaultDosage: defaultDosage,
+                defaultUnit: defaultUnit,
+                shape: shape,
+                colorHex: colorHex,
+                iconKey: iconKey,
+                tagsJson: tagsJson,
+                source: source,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CatalogItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CatalogItemsTable,
+      CatalogItem,
+      $$CatalogItemsTableFilterComposer,
+      $$CatalogItemsTableOrderingComposer,
+      $$CatalogItemsTableAnnotationComposer,
+      $$CatalogItemsTableCreateCompanionBuilder,
+      $$CatalogItemsTableUpdateCompanionBuilder,
+      (
+        CatalogItem,
+        BaseReferences<_$AppDatabase, $CatalogItemsTable, CatalogItem>,
+      ),
+      CatalogItem,
+      PrefetchHooks Function()
+    >;
 typedef $$MedicationsTableCreateCompanionBuilder =
     MedicationsCompanion Function({
       Value<int> id,
@@ -4677,6 +5773,8 @@ typedef $$IntervalOccurrencesTableProcessedTableManager =
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
+  $$CatalogItemsTableTableManager get catalogItems =>
+      $$CatalogItemsTableTableManager(_db, _db.catalogItems);
   $$MedicationsTableTableManager get medications =>
       $$MedicationsTableTableManager(_db, _db.medications);
   $$SchedulesTableTableManager get schedules =>
