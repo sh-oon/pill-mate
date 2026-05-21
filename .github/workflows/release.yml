@@ -130,13 +130,18 @@ jobs:
 
   build-ios:
     name: Build iOS (no-codesign smoke until Apple Dev ready)
-    runs-on: macos-14
+    runs-on: macos-15
     needs: semantic-release
     if: needs.semantic-release.outputs.released == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.semantic-release.outputs.tag }}
+
+      # cupertino_native_better 1.4.5 needs iOS 26 SDK (Liquid Glass).
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
 
       - uses: subosito/flutter-action@v2
         with:
