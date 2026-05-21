@@ -48,12 +48,22 @@ class IntakeRepository {
         .watch();
   }
 
-  /// 범위 내 IntakeLog 일괄 조회 (월간 캘린더/리포트용).
+  /// 범위 내 IntakeLog 일괄 조회 (리포트용 1회성).
   Future<List<IntakeLog>> getRange(DateTime startInclusive, DateTime endExclusive) {
     return (_db.select(_db.intakeLogs)
           ..where((l) =>
               l.scheduledAt.isBetweenValues(startInclusive, endExclusive)))
         .get();
+  }
+
+  /// 범위 내 IntakeLog 스트림 (캘린더용 — markTaken/markSkipped 후 자동 갱신).
+  /// FutureProvider + getRange를 쓰면 홈에서 상태 변경 시 캘린더가 stale 표시.
+  Stream<List<IntakeLog>> watchRange(
+      DateTime startInclusive, DateTime endExclusive) {
+    return (_db.select(_db.intakeLogs)
+          ..where((l) =>
+              l.scheduledAt.isBetweenValues(startInclusive, endExclusive)))
+        .watch();
   }
 
   /// 특정 (medicationId, scheduleId, scheduledAt) 슬롯에 상태 기록.
