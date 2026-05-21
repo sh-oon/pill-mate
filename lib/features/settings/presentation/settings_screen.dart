@@ -149,6 +149,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                 context.go(AppRoute.splash);
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.palette_outlined),
+              title: const Text('Phase 3 mockups'),
+              subtitle: const Text('등록 플로우 + drawer + tracked detail 디자인 참고'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(AppRoute.mockups),
+            ),
           ],
         ],
       ),

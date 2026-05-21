@@ -12,6 +12,7 @@ import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
+import '../../mockups/mockups_index.dart';
 import 'tab_shell.dart';
 
 class AppRoute {
@@ -29,6 +30,10 @@ class AppRoute {
   static const reports = '/reports';
   static const calendar = '/calendar';
   static const settings = '/settings';
+
+  /// Phase 3 디자인 mockup 색인 (debug only — release build에서도 라우트는
+  /// 등록되지만 진입로는 settings에서 kDebugMode일 때만 노출).
+  static const mockups = '/mockups';
 }
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -58,6 +63,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: AppRoute.settings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+
+      // Phase 3 디자인 mockup 색인 (dev only).
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: AppRoute.mockups,
+        builder: (context, state) => const MockupsIndex(),
       ),
 
       // 4개 탭 셸.
