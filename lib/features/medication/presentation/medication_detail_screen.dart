@@ -21,7 +21,7 @@ class MedicationDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(medicationByIdProvider(medicationId));
+    final async = ref.watch(trackedMedicationByIdProvider(medicationId));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -60,7 +60,7 @@ class MedicationDetailScreen extends ConsumerWidget {
 
 class _DetailBody extends ConsumerWidget {
   const _DetailBody({required this.data});
-  final MedicationWithSchedules data;
+  final TrackedMedicationWithSchedules data;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -131,7 +131,7 @@ class _DetailBody extends ConsumerWidget {
                 value: alarmOn,
                 onChanged: (v) {
                   ref
-                      .read(medicationRepositoryProvider)
+                      .read(trackedMedicationRepositoryProvider)
                       .setAlarmEnabled(m.id, v);
                 },
               ),
@@ -207,7 +207,7 @@ class _DetailBody extends ConsumerWidget {
                     if (!context.mounted) return;
                     if (ok) {
                       await ref
-                          .read(medicationRepositoryProvider)
+                          .read(trackedMedicationRepositoryProvider)
                           .delete(m.id);
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(

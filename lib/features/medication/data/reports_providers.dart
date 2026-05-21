@@ -90,7 +90,7 @@ final dosesByRangeProvider = FutureProvider.family
     .autoDispose<Map<DateTime, List<DoseInstance>>, PeriodRange>(
         (ref, range) async {
   final repo = ref.watch(intakeRepositoryProvider);
-  final medsAsync = ref.watch(medicationsStreamProvider);
+  final medsAsync = ref.watch(trackedMedicationsStreamProvider);
 
   return medsAsync.when(
     loading: () async => <DateTime, List<DoseInstance>>{},
@@ -344,7 +344,7 @@ final periodBestTimeOfDayProvider =
 /// 연속 복용 일수 — 오늘부터 거꾸로, 그 날 dose가 모두 taken이면 streak +1.
 final streakProvider = FutureProvider<int>((ref) async {
   final repo = ref.watch(intakeRepositoryProvider);
-  final medsAsync = ref.watch(medicationsStreamProvider);
+  final medsAsync = ref.watch(trackedMedicationsStreamProvider);
 
   return medsAsync.when(
     loading: () async => 0,

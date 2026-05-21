@@ -36,7 +36,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
     super.dispose();
   }
 
-  bool _matchesCategory(MedicationWithSchedules m) {
+  bool _matchesCategory(TrackedMedicationWithSchedules m) {
     final cat = m.medication.category;
     return switch (_filter) {
       _CategoryFilter.all => true,
@@ -46,7 +46,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
   }
 
   /// 검색어 substring 매칭 — 약 이름 + 메모 (대소문자 무시).
-  bool _matchesQuery(MedicationWithSchedules m) {
+  bool _matchesQuery(TrackedMedicationWithSchedules m) {
     if (_query.isEmpty) return true;
     final q = _query.toLowerCase();
     final name = m.medication.name.toLowerCase();
@@ -54,7 +54,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
     return name.contains(q) || memo.contains(q);
   }
 
-  bool _matches(MedicationWithSchedules m) =>
+  bool _matches(TrackedMedicationWithSchedules m) =>
       _matchesCategory(m) && _matchesQuery(m);
 
   Future<void> _pickSort() async {
@@ -99,7 +99,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final async = ref.watch(medicationsStreamProvider);
+    final async = ref.watch(trackedMedicationsStreamProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -152,7 +152,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
                     ),
                     onDismissed: () async {
                       await ref
-                          .read(medicationRepositoryProvider)
+                          .read(trackedMedicationRepositoryProvider)
                           .delete(m.medication.id);
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -165,7 +165,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
                       data: m,
                       onToggleAlarm: (v) {
                         ref
-                            .read(medicationRepositoryProvider)
+                            .read(trackedMedicationRepositoryProvider)
                             .setAlarmEnabled(m.medication.id, v);
                       },
                       onTap: () => context.push(
@@ -276,7 +276,7 @@ extension on _MedicationSort {
         _MedicationSort.nextDose => '다음 복용순',
       };
 
-  int Function(MedicationWithSchedules, MedicationWithSchedules) get comparator =>
+  int Function(TrackedMedicationWithSchedules, TrackedMedicationWithSchedules) get comparator =>
       switch (this) {
         _MedicationSort.name => _byName,
         _MedicationSort.recent => _byRecent,
@@ -284,14 +284,14 @@ extension on _MedicationSort {
       };
 }
 
-int _byName(MedicationWithSchedules a, MedicationWithSchedules b) =>
+int _byName(TrackedMedicationWithSchedules a, TrackedMedicationWithSchedules b) =>
     a.medication.name.toLowerCase().compareTo(b.medication.name.toLowerCase());
 
-int _byRecent(MedicationWithSchedules a, MedicationWithSchedules b) =>
+int _byRecent(TrackedMedicationWithSchedules a, TrackedMedicationWithSchedules b) =>
     b.medication.createdAt.compareTo(a.medication.createdAt);
 
 /// PRN(스케줄 없음)은 항상 마지막. 그 외엔 가장 가까운 미래 복용시각 오름차순.
-int _byNextDose(MedicationWithSchedules a, MedicationWithSchedules b) {
+int _byNextDose(TrackedMedicationWithSchedules a, TrackedMedicationWithSchedules b) {
   final na = _nextDoseAt(a);
   final nb = _nextDoseAt(b);
   if (na == null && nb == null) return _byName(a, b);
@@ -303,7 +303,7 @@ int _byNextDose(MedicationWithSchedules a, MedicationWithSchedules b) {
 
 /// 약의 가장 가까운 미래 복용 시각 (오늘 남은 슬롯 있으면 오늘, 아니면 내일 첫
 /// 슬롯). PRN(스케줄 없음)이면 null.
-DateTime? _nextDoseAt(MedicationWithSchedules m) {
+DateTime? _nextDoseAt(TrackedMedicationWithSchedules m) {
   if (m.schedules.isEmpty) return null;
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
@@ -334,7 +334,7 @@ class _MedListCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final MedicationWithSchedules data;
+  final TrackedMedicationWithSchedules data;
   final ValueChanged<bool> onToggleAlarm;
   final VoidCallback onTap;
 

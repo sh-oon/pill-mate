@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import 'medications.dart';
+import 'tracked_medications.dart';
 
 /// 반복 패턴 종류
 /// - daily: 매일
@@ -11,8 +11,10 @@ enum RepeatKind { daily, weekly, interval }
 class Schedules extends Table {
   IntColumn get id => integer().autoIncrement()();
 
+  /// FK → tracked_medications.id. 변수명은 호환성 위해 medicationId 유지
+  /// (Phase 2B/3에서 trackedMedicationId로 점진 rename).
   IntColumn get medicationId =>
-      integer().references(Medications, #id, onDelete: KeyAction.cascade)();
+      integer().references(TrackedMedications, #id, onDelete: KeyAction.cascade)();
 
   /// "HH:mm" 형식 복용 예정 시각 (단일 시각). 여러 시각이 필요하면 행을 복수로.
   TextColumn get timeOfDay => text().withLength(min: 5, max: 5)();

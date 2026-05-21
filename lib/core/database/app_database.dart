@@ -6,15 +6,15 @@ import 'seed/catalog_seed_loader.dart';
 import 'tables/catalog_items.dart';
 import 'tables/intake_logs.dart';
 import 'tables/interval_occurrences.dart';
-import 'tables/medications.dart';
 import 'tables/schedules.dart';
+import 'tables/tracked_medications.dart';
 
 part 'app_database.g.dart';
 
 @DriftDatabase(
   tables: [
     CatalogItems,
-    Medications,
+    TrackedMedications,
     Schedules,
     IntakeLogs,
     IntervalOccurrences,
@@ -26,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -35,19 +35,23 @@ class AppDatabase extends _$AppDatabase {
           await _seedCatalogIfEmpty();
         },
         onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            // v2: medications.category 컬럼 추가 (nullable text).
-            await m.addColumn(medications, medications.category);
-          }
-          if (from < 3) {
-            // v3: interval_occurrences 테이블 신설.
-            await m.createTable(intervalOccurrences);
-          }
-          if (from < 4) {
-            // v4: catalog_items 테이블 신설 (additive).
-            // 기존 medications/schedules/intake_logs 무변경 — Phase 2에서 FK 연결.
-            await m.createTable(catalogItems);
+          // v5: medications → tracked_medications rename + catalog_item_id FK.
+          // 사용자 결정 (catalog-tracking-split plan §C-3): 알파 단계라 전체 wipe.
+          // 기존 v1~v4 데이터 모두 삭제 후 신규 스키마로 재생성.
+          //
+          // schedules/intake_logs/interval_occurrences는 medications FK였으므로
+          // 같이 drop. 시드 카탈로그는 재로딩.
+          if (from < 5) {
+            await customStatement('PRAGMA foreign_keys = OFF');
+            await customStatement('DROP TABLE IF EXISTS intake_logs');
+            await customStatement('DROP TABLE IF EXISTS interval_occurrences');
+            await customStatement('DROP TABLE IF EXISTS schedules');
+            await customStatement('DROP TABLE IF EXISTS medications');
+            await customStatement('DROP TABLE IF EXISTS catalog_items');
+            await customStatement('PRAGMA foreign_keys = ON');
+            await m.createAll();
             await _seedCatalogIfEmpty();
+            return;
           }
         },
         beforeOpen: (details) async {

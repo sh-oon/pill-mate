@@ -5,13 +5,13 @@ import '../../../core/database/tables/schedules.dart';
 import '../../../core/notifications/medication_notification_manager.dart';
 
 /// 약 + 해당 약의 스케줄들을 한 묶음으로 노출.
-class MedicationWithSchedules {
-  const MedicationWithSchedules({
+class TrackedMedicationWithSchedules {
+  const TrackedMedicationWithSchedules({
     required this.medication,
     required this.schedules,
   });
 
-  final Medication medication;
+  final TrackedMedication medication;
   final List<Schedule> schedules;
 
   /// "HH:mm" 시각 리스트 (오름차순).
@@ -30,8 +30,8 @@ class MedicationWithSchedules {
 }
 
 /// 신규/수정 시 입력 폼.
-class MedicationDraft {
-  const MedicationDraft({
+class TrackedMedicationDraft {
+  const TrackedMedicationDraft({
     required this.name,
     required this.category,
     required this.times,
@@ -63,8 +63,8 @@ class MedicationDraft {
   final int? remindBeforeMinutes;
 }
 
-class MedicationRepository {
-  MedicationRepository(this._db, this._notif);
+class TrackedMedicationRepository {
+  TrackedMedicationRepository(this._db, this._notif);
 
   final AppDatabase _db;
   final MedicationNotificationManager _notif;
@@ -73,22 +73,22 @@ class MedicationRepository {
   ///
   /// join을 써서 watch가 medications + schedules 두 테이블 모두 추적.
   /// (단일 테이블 watch는 schedule만 바뀐 경우 누락 가능)
-  Stream<List<MedicationWithSchedules>> watchAll() {
-    final query = _db.select(_db.medications).join([
+  Stream<List<TrackedMedicationWithSchedules>> watchAll() {
+    final query = _db.select(_db.trackedMedications).join([
       leftOuterJoin(
         _db.schedules,
-        _db.schedules.medicationId.equalsExp(_db.medications.id) &
+        _db.schedules.medicationId.equalsExp(_db.trackedMedications.id) &
             _db.schedules.enabled.equals(true),
       ),
     ])
-      ..where(_db.medications.archived.equals(false))
-      ..orderBy([OrderingTerm(expression: _db.medications.name)]);
+      ..where(_db.trackedMedications.archived.equals(false))
+      ..orderBy([OrderingTerm(expression: _db.trackedMedications.name)]);
 
     return query.watch().map((rows) {
-      final medsById = <int, Medication>{};
+      final medsById = <int, TrackedMedication>{};
       final schedsById = <int, List<Schedule>>{};
       for (final row in rows) {
-        final med = row.readTable(_db.medications);
+        final med = row.readTable(_db.trackedMedications);
         medsById.putIfAbsent(med.id, () => med);
         final sched = row.readTableOrNull(_db.schedules);
         if (sched != null) {
@@ -97,7 +97,7 @@ class MedicationRepository {
       }
       return [
         for (final m in medsById.values)
-          MedicationWithSchedules(
+          TrackedMedicationWithSchedules(
             medication: m,
             schedules: schedsById[m.id] ?? const [],
           ),
@@ -106,42 +106,42 @@ class MedicationRepository {
   }
 
   /// 단일 약 + 스케줄 스트림. join으로 두 테이블 추적.
-  Stream<MedicationWithSchedules?> watchById(int id) {
-    final query = _db.select(_db.medications).join([
+  Stream<TrackedMedicationWithSchedules?> watchById(int id) {
+    final query = _db.select(_db.trackedMedications).join([
       leftOuterJoin(
         _db.schedules,
-        _db.schedules.medicationId.equalsExp(_db.medications.id),
+        _db.schedules.medicationId.equalsExp(_db.trackedMedications.id),
       ),
-    ])..where(_db.medications.id.equals(id));
+    ])..where(_db.trackedMedications.id.equals(id));
 
     return query.watch().map((rows) {
       if (rows.isEmpty) return null;
-      final med = rows.first.readTable(_db.medications);
+      final med = rows.first.readTable(_db.trackedMedications);
       final scheds = <Schedule>[
         for (final r in rows)
           if (r.readTableOrNull(_db.schedules) != null)
             r.readTable(_db.schedules),
       ];
-      return MedicationWithSchedules(medication: med, schedules: scheds);
+      return TrackedMedicationWithSchedules(medication: med, schedules: scheds);
     });
   }
 
-  Future<MedicationWithSchedules?> getById(int id) async {
-    final med = await (_db.select(_db.medications)
+  Future<TrackedMedicationWithSchedules?> getById(int id) async {
+    final med = await (_db.select(_db.trackedMedications)
           ..where((m) => m.id.equals(id)))
         .getSingleOrNull();
     if (med == null) return null;
     final scheds = await (_db.select(_db.schedules)
           ..where((s) => s.medicationId.equals(id)))
         .get();
-    return MedicationWithSchedules(medication: med, schedules: scheds);
+    return TrackedMedicationWithSchedules(medication: med, schedules: scheds);
   }
 
   /// 신규 등록. 트랜잭션으로 medication + schedules 동시 insert + 알림 동기화.
-  Future<int> insertWithSchedules(MedicationDraft draft) async {
+  Future<int> insertWithSchedules(TrackedMedicationDraft draft) async {
     final medId = await _db.transaction(() async {
-      final id = await _db.into(_db.medications).insert(
-            MedicationsCompanion.insert(
+      final id = await _db.into(_db.trackedMedications).insert(
+            TrackedMedicationsCompanion.insert(
               name: draft.name,
               category: Value(draft.category),
               dosage: Value(draft.dosage),
@@ -171,10 +171,10 @@ class MedicationRepository {
   }
 
   /// 기존 약 수정. 스케줄은 통째로 교체 + 알림 재동기화.
-  Future<void> updateWithSchedules(int id, MedicationDraft draft) async {
+  Future<void> updateWithSchedules(int id, TrackedMedicationDraft draft) async {
     await _db.transaction(() async {
-      await (_db.update(_db.medications)..where((m) => m.id.equals(id))).write(
-        MedicationsCompanion(
+      await (_db.update(_db.trackedMedications)..where((m) => m.id.equals(id))).write(
+        TrackedMedicationsCompanion(
           name: Value(draft.name),
           category: Value(draft.category),
           dosage: Value(draft.dosage),
@@ -208,7 +208,7 @@ class MedicationRepository {
   Future<void> delete(int id) async {
     // cascade로 schedules가 사라지기 전에 알림 취소 (id 매핑 위해).
     await _notif.cancelForMedication(id);
-    await (_db.delete(_db.medications)..where((m) => m.id.equals(id))).go();
+    await (_db.delete(_db.trackedMedications)..where((m) => m.id.equals(id))).go();
   }
 
   /// 알람 on/off (모든 스케줄 enabled toggle) + 알림 동기화.

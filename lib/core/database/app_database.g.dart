@@ -759,12 +759,12 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItem> {
   }
 }
 
-class $MedicationsTable extends Medications
-    with TableInfo<$MedicationsTable, Medication> {
+class $TrackedMedicationsTable extends TrackedMedications
+    with TableInfo<$TrackedMedicationsTable, TrackedMedication> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $MedicationsTable(this.attachedDatabase, [this._alias]);
+  $TrackedMedicationsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
@@ -776,6 +776,20 @@ class $MedicationsTable extends Medications
     requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _catalogItemIdMeta = const VerificationMeta(
+    'catalogItemId',
+  );
+  @override
+  late final GeneratedColumn<String> catalogItemId = GeneratedColumn<String>(
+    'catalog_item_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES catalog_items (id) ON DELETE SET NULL',
     ),
   );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
@@ -911,6 +925,7 @@ class $MedicationsTable extends Medications
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    catalogItemId,
     name,
     category,
     dosage,
@@ -927,16 +942,25 @@ class $MedicationsTable extends Medications
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'medications';
+  static const String $name = 'tracked_medications';
   @override
   VerificationContext validateIntegrity(
-    Insertable<Medication> instance, {
+    Insertable<TrackedMedication> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('catalog_item_id')) {
+      context.handle(
+        _catalogItemIdMeta,
+        catalogItemId.isAcceptableOrUnknown(
+          data['catalog_item_id']!,
+          _catalogItemIdMeta,
+        ),
+      );
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -1012,13 +1036,17 @@ class $MedicationsTable extends Medications
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Medication map(Map<String, dynamic> data, {String? tablePrefix}) {
+  TrackedMedication map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Medication(
+    return TrackedMedication(
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}id'],
       )!,
+      catalogItemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}catalog_item_id'],
+      ),
       name: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}name'],
@@ -1067,13 +1095,18 @@ class $MedicationsTable extends Medications
   }
 
   @override
-  $MedicationsTable createAlias(String alias) {
-    return $MedicationsTable(attachedDatabase, alias);
+  $TrackedMedicationsTable createAlias(String alias) {
+    return $TrackedMedicationsTable(attachedDatabase, alias);
   }
 }
 
-class Medication extends DataClass implements Insertable<Medication> {
+class TrackedMedication extends DataClass
+    implements Insertable<TrackedMedication> {
   final int id;
+
+  /// 카탈로그 항목 FK. nullable: 마이그레이션 이전 데이터/직접 입력 경로.
+  /// 카탈로그 항목 삭제 시 setNull (사용자 tracked는 남되 카탈로그 연결만 끊김).
+  final String? catalogItemId;
   final String name;
 
   /// 'med' (약) | 'sup' (영양제). 카테고리.
@@ -1087,8 +1120,9 @@ class Medication extends DataClass implements Insertable<Medication> {
   final bool archived;
   final DateTime createdAt;
   final DateTime updatedAt;
-  const Medication({
+  const TrackedMedication({
     required this.id,
+    this.catalogItemId,
     required this.name,
     this.category,
     this.dosage,
@@ -1105,6 +1139,9 @@ class Medication extends DataClass implements Insertable<Medication> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
+    if (!nullToAbsent || catalogItemId != null) {
+      map['catalog_item_id'] = Variable<String>(catalogItemId);
+    }
     map['name'] = Variable<String>(name);
     if (!nullToAbsent || category != null) {
       map['category'] = Variable<String>(category);
@@ -1133,9 +1170,12 @@ class Medication extends DataClass implements Insertable<Medication> {
     return map;
   }
 
-  MedicationsCompanion toCompanion(bool nullToAbsent) {
-    return MedicationsCompanion(
+  TrackedMedicationsCompanion toCompanion(bool nullToAbsent) {
+    return TrackedMedicationsCompanion(
       id: Value(id),
+      catalogItemId: catalogItemId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(catalogItemId),
       name: Value(name),
       category: category == null && nullToAbsent
           ? const Value.absent()
@@ -1160,13 +1200,14 @@ class Medication extends DataClass implements Insertable<Medication> {
     );
   }
 
-  factory Medication.fromJson(
+  factory TrackedMedication.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Medication(
+    return TrackedMedication(
       id: serializer.fromJson<int>(json['id']),
+      catalogItemId: serializer.fromJson<String?>(json['catalogItemId']),
       name: serializer.fromJson<String>(json['name']),
       category: serializer.fromJson<String?>(json['category']),
       dosage: serializer.fromJson<String?>(json['dosage']),
@@ -1185,6 +1226,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
+      'catalogItemId': serializer.toJson<String?>(catalogItemId),
       'name': serializer.toJson<String>(name),
       'category': serializer.toJson<String?>(category),
       'dosage': serializer.toJson<String?>(dosage),
@@ -1199,8 +1241,9 @@ class Medication extends DataClass implements Insertable<Medication> {
     };
   }
 
-  Medication copyWith({
+  TrackedMedication copyWith({
     int? id,
+    Value<String?> catalogItemId = const Value.absent(),
     String? name,
     Value<String?> category = const Value.absent(),
     Value<String?> dosage = const Value.absent(),
@@ -1212,8 +1255,11 @@ class Medication extends DataClass implements Insertable<Medication> {
     bool? archived,
     DateTime? createdAt,
     DateTime? updatedAt,
-  }) => Medication(
+  }) => TrackedMedication(
     id: id ?? this.id,
+    catalogItemId: catalogItemId.present
+        ? catalogItemId.value
+        : this.catalogItemId,
     name: name ?? this.name,
     category: category.present ? category.value : this.category,
     dosage: dosage.present ? dosage.value : this.dosage,
@@ -1226,9 +1272,12 @@ class Medication extends DataClass implements Insertable<Medication> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
-  Medication copyWithCompanion(MedicationsCompanion data) {
-    return Medication(
+  TrackedMedication copyWithCompanion(TrackedMedicationsCompanion data) {
+    return TrackedMedication(
       id: data.id.present ? data.id.value : this.id,
+      catalogItemId: data.catalogItemId.present
+          ? data.catalogItemId.value
+          : this.catalogItemId,
       name: data.name.present ? data.name.value : this.name,
       category: data.category.present ? data.category.value : this.category,
       dosage: data.dosage.present ? data.dosage.value : this.dosage,
@@ -1245,8 +1294,9 @@ class Medication extends DataClass implements Insertable<Medication> {
 
   @override
   String toString() {
-    return (StringBuffer('Medication(')
+    return (StringBuffer('TrackedMedication(')
           ..write('id: $id, ')
+          ..write('catalogItemId: $catalogItemId, ')
           ..write('name: $name, ')
           ..write('category: $category, ')
           ..write('dosage: $dosage, ')
@@ -1265,6 +1315,7 @@ class Medication extends DataClass implements Insertable<Medication> {
   @override
   int get hashCode => Object.hash(
     id,
+    catalogItemId,
     name,
     category,
     dosage,
@@ -1280,8 +1331,9 @@ class Medication extends DataClass implements Insertable<Medication> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Medication &&
+      (other is TrackedMedication &&
           other.id == this.id &&
+          other.catalogItemId == this.catalogItemId &&
           other.name == this.name &&
           other.category == this.category &&
           other.dosage == this.dosage &&
@@ -1295,8 +1347,9 @@ class Medication extends DataClass implements Insertable<Medication> {
           other.updatedAt == this.updatedAt);
 }
 
-class MedicationsCompanion extends UpdateCompanion<Medication> {
+class TrackedMedicationsCompanion extends UpdateCompanion<TrackedMedication> {
   final Value<int> id;
+  final Value<String?> catalogItemId;
   final Value<String> name;
   final Value<String?> category;
   final Value<String?> dosage;
@@ -1308,8 +1361,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   final Value<bool> archived;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
-  const MedicationsCompanion({
+  const TrackedMedicationsCompanion({
     this.id = const Value.absent(),
+    this.catalogItemId = const Value.absent(),
     this.name = const Value.absent(),
     this.category = const Value.absent(),
     this.dosage = const Value.absent(),
@@ -1322,8 +1376,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
-  MedicationsCompanion.insert({
+  TrackedMedicationsCompanion.insert({
     this.id = const Value.absent(),
+    this.catalogItemId = const Value.absent(),
     required String name,
     this.category = const Value.absent(),
     this.dosage = const Value.absent(),
@@ -1336,8 +1391,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   }) : name = Value(name);
-  static Insertable<Medication> custom({
+  static Insertable<TrackedMedication> custom({
     Expression<int>? id,
+    Expression<String>? catalogItemId,
     Expression<String>? name,
     Expression<String>? category,
     Expression<String>? dosage,
@@ -1352,6 +1408,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (catalogItemId != null) 'catalog_item_id': catalogItemId,
       if (name != null) 'name': name,
       if (category != null) 'category': category,
       if (dosage != null) 'dosage': dosage,
@@ -1366,8 +1423,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     });
   }
 
-  MedicationsCompanion copyWith({
+  TrackedMedicationsCompanion copyWith({
     Value<int>? id,
+    Value<String?>? catalogItemId,
     Value<String>? name,
     Value<String?>? category,
     Value<String?>? dosage,
@@ -1380,8 +1438,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
-    return MedicationsCompanion(
+    return TrackedMedicationsCompanion(
       id: id ?? this.id,
+      catalogItemId: catalogItemId ?? this.catalogItemId,
       name: name ?? this.name,
       category: category ?? this.category,
       dosage: dosage ?? this.dosage,
@@ -1401,6 +1460,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<int>(id.value);
+    }
+    if (catalogItemId.present) {
+      map['catalog_item_id'] = Variable<String>(catalogItemId.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -1440,8 +1502,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
 
   @override
   String toString() {
-    return (StringBuffer('MedicationsCompanion(')
+    return (StringBuffer('TrackedMedicationsCompanion(')
           ..write('id: $id, ')
+          ..write('catalogItemId: $catalogItemId, ')
           ..write('name: $name, ')
           ..write('category: $category, ')
           ..write('dosage: $dosage, ')
@@ -1488,7 +1551,7 @@ class $SchedulesTable extends Schedules
     type: DriftSqlType.int,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES medications (id) ON DELETE CASCADE',
+      'REFERENCES tracked_medications (id) ON DELETE CASCADE',
     ),
   );
   static const VerificationMeta _timeOfDayMeta = const VerificationMeta(
@@ -1839,6 +1902,9 @@ class $SchedulesTable extends Schedules
 
 class Schedule extends DataClass implements Insertable<Schedule> {
   final int id;
+
+  /// FK → tracked_medications.id. 변수명은 호환성 위해 medicationId 유지
+  /// (Phase 2B/3에서 trackedMedicationId로 점진 rename).
   final int medicationId;
 
   /// "HH:mm" 형식 복용 예정 시각 (단일 시각). 여러 시각이 필요하면 행을 복수로.
@@ -2351,7 +2417,7 @@ class $IntakeLogsTable extends IntakeLogs
     type: DriftSqlType.int,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES medications (id) ON DELETE CASCADE',
+      'REFERENCES tracked_medications (id) ON DELETE CASCADE',
     ),
   );
   static const VerificationMeta _scheduleIdMeta = const VerificationMeta(
@@ -2601,6 +2667,8 @@ class $IntakeLogsTable extends IntakeLogs
 
 class IntakeLog extends DataClass implements Insertable<IntakeLog> {
   final int id;
+
+  /// FK → tracked_medications.id. 변수명은 호환성 위해 medicationId 유지.
   final int medicationId;
   final int scheduleId;
 
@@ -3312,7 +3380,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CatalogItemsTable catalogItems = $CatalogItemsTable(this);
-  late final $MedicationsTable medications = $MedicationsTable(this);
+  late final $TrackedMedicationsTable trackedMedications =
+      $TrackedMedicationsTable(this);
   late final $SchedulesTable schedules = $SchedulesTable(this);
   late final $IntakeLogsTable intakeLogs = $IntakeLogsTable(this);
   late final $IntervalOccurrencesTable intervalOccurrences =
@@ -3323,7 +3392,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     catalogItems,
-    medications,
+    trackedMedications,
     schedules,
     intakeLogs,
     intervalOccurrences,
@@ -3332,14 +3401,21 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
     WritePropagation(
       on: TableUpdateQuery.onTableName(
-        'medications',
+        'catalog_items',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('tracked_medications', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tracked_medications',
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('schedules', kind: UpdateKind.delete)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
-        'medications',
+        'tracked_medications',
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('intake_logs', kind: UpdateKind.delete)],
@@ -3393,6 +3469,35 @@ typedef $$CatalogItemsTableUpdateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
+
+final class $$CatalogItemsTableReferences
+    extends BaseReferences<_$AppDatabase, $CatalogItemsTable, CatalogItem> {
+  $$CatalogItemsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$TrackedMedicationsTable, List<TrackedMedication>>
+  _trackedMedicationsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.trackedMedications,
+        aliasName: $_aliasNameGenerator(
+          db.catalogItems.id,
+          db.trackedMedications.catalogItemId,
+        ),
+      );
+
+  $$TrackedMedicationsTableProcessedTableManager get trackedMedicationsRefs {
+    final manager = $$TrackedMedicationsTableTableManager(
+      $_db,
+      $_db.trackedMedications,
+    ).filter((f) => f.catalogItemId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _trackedMedicationsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
 
 class $$CatalogItemsTableFilterComposer
     extends Composer<_$AppDatabase, $CatalogItemsTable> {
@@ -3463,6 +3568,31 @@ class $$CatalogItemsTableFilterComposer
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  Expression<bool> trackedMedicationsRefs(
+    Expression<bool> Function($$TrackedMedicationsTableFilterComposer f) f,
+  ) {
+    final $$TrackedMedicationsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.trackedMedications,
+      getReferencedColumn: (t) => t.catalogItemId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TrackedMedicationsTableFilterComposer(
+            $db: $db,
+            $table: $db.trackedMedications,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CatalogItemsTableOrderingComposer
@@ -3583,6 +3713,32 @@ class $$CatalogItemsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  Expression<T> trackedMedicationsRefs<T extends Object>(
+    Expression<T> Function($$TrackedMedicationsTableAnnotationComposer a) f,
+  ) {
+    final $$TrackedMedicationsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.trackedMedications,
+          getReferencedColumn: (t) => t.catalogItemId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$TrackedMedicationsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.trackedMedications,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$CatalogItemsTableTableManager
@@ -3596,12 +3752,9 @@ class $$CatalogItemsTableTableManager
           $$CatalogItemsTableAnnotationComposer,
           $$CatalogItemsTableCreateCompanionBuilder,
           $$CatalogItemsTableUpdateCompanionBuilder,
-          (
-            CatalogItem,
-            BaseReferences<_$AppDatabase, $CatalogItemsTable, CatalogItem>,
-          ),
+          (CatalogItem, $$CatalogItemsTableReferences),
           CatalogItem,
-          PrefetchHooks Function()
+          PrefetchHooks Function({bool trackedMedicationsRefs})
         > {
   $$CatalogItemsTableTableManager(_$AppDatabase db, $CatalogItemsTable table)
     : super(
@@ -3675,9 +3828,47 @@ class $$CatalogItemsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$CatalogItemsTableReferences(db, table, e),
+                ),
+              )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({trackedMedicationsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (trackedMedicationsRefs) db.trackedMedications,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (trackedMedicationsRefs)
+                    await $_getPrefetchedData<
+                      CatalogItem,
+                      $CatalogItemsTable,
+                      TrackedMedication
+                    >(
+                      currentTable: table,
+                      referencedTable: $$CatalogItemsTableReferences
+                          ._trackedMedicationsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$CatalogItemsTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).trackedMedicationsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where(
+                            (e) => e.catalogItemId == item.id,
+                          ),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
         ),
       );
 }
@@ -3692,16 +3883,14 @@ typedef $$CatalogItemsTableProcessedTableManager =
       $$CatalogItemsTableAnnotationComposer,
       $$CatalogItemsTableCreateCompanionBuilder,
       $$CatalogItemsTableUpdateCompanionBuilder,
-      (
-        CatalogItem,
-        BaseReferences<_$AppDatabase, $CatalogItemsTable, CatalogItem>,
-      ),
+      (CatalogItem, $$CatalogItemsTableReferences),
       CatalogItem,
-      PrefetchHooks Function()
+      PrefetchHooks Function({bool trackedMedicationsRefs})
     >;
-typedef $$MedicationsTableCreateCompanionBuilder =
-    MedicationsCompanion Function({
+typedef $$TrackedMedicationsTableCreateCompanionBuilder =
+    TrackedMedicationsCompanion Function({
       Value<int> id,
+      Value<String?> catalogItemId,
       required String name,
       Value<String?> category,
       Value<String?> dosage,
@@ -3714,9 +3903,10 @@ typedef $$MedicationsTableCreateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
-typedef $$MedicationsTableUpdateCompanionBuilder =
-    MedicationsCompanion Function({
+typedef $$TrackedMedicationsTableUpdateCompanionBuilder =
+    TrackedMedicationsCompanion Function({
       Value<int> id,
+      Value<String?> catalogItemId,
       Value<String> name,
       Value<String?> category,
       Value<String?> dosage,
@@ -3730,15 +3920,46 @@ typedef $$MedicationsTableUpdateCompanionBuilder =
       Value<DateTime> updatedAt,
     });
 
-final class $$MedicationsTableReferences
-    extends BaseReferences<_$AppDatabase, $MedicationsTable, Medication> {
-  $$MedicationsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+final class $$TrackedMedicationsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $TrackedMedicationsTable,
+          TrackedMedication
+        > {
+  $$TrackedMedicationsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CatalogItemsTable _catalogItemIdTable(_$AppDatabase db) =>
+      db.catalogItems.createAlias(
+        $_aliasNameGenerator(
+          db.trackedMedications.catalogItemId,
+          db.catalogItems.id,
+        ),
+      );
+
+  $$CatalogItemsTableProcessedTableManager? get catalogItemId {
+    final $_column = $_itemColumn<String>('catalog_item_id');
+    if ($_column == null) return null;
+    final manager = $$CatalogItemsTableTableManager(
+      $_db,
+      $_db.catalogItems,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_catalogItemIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
 
   static MultiTypedResultKey<$SchedulesTable, List<Schedule>>
   _schedulesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.schedules,
     aliasName: $_aliasNameGenerator(
-      db.medications.id,
+      db.trackedMedications.id,
       db.schedules.medicationId,
     ),
   );
@@ -3759,7 +3980,7 @@ final class $$MedicationsTableReferences
   _intakeLogsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.intakeLogs,
     aliasName: $_aliasNameGenerator(
-      db.medications.id,
+      db.trackedMedications.id,
       db.intakeLogs.medicationId,
     ),
   );
@@ -3777,9 +3998,9 @@ final class $$MedicationsTableReferences
   }
 }
 
-class $$MedicationsTableFilterComposer
-    extends Composer<_$AppDatabase, $MedicationsTable> {
-  $$MedicationsTableFilterComposer({
+class $$TrackedMedicationsTableFilterComposer
+    extends Composer<_$AppDatabase, $TrackedMedicationsTable> {
+  $$TrackedMedicationsTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -3846,6 +4067,29 @@ class $$MedicationsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  $$CatalogItemsTableFilterComposer get catalogItemId {
+    final $$CatalogItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.catalogItemId,
+      referencedTable: $db.catalogItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CatalogItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.catalogItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
   Expression<bool> schedulesRefs(
     Expression<bool> Function($$SchedulesTableFilterComposer f) f,
   ) {
@@ -3897,9 +4141,9 @@ class $$MedicationsTableFilterComposer
   }
 }
 
-class $$MedicationsTableOrderingComposer
-    extends Composer<_$AppDatabase, $MedicationsTable> {
-  $$MedicationsTableOrderingComposer({
+class $$TrackedMedicationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TrackedMedicationsTable> {
+  $$TrackedMedicationsTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -3965,11 +4209,34 @@ class $$MedicationsTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  $$CatalogItemsTableOrderingComposer get catalogItemId {
+    final $$CatalogItemsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.catalogItemId,
+      referencedTable: $db.catalogItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CatalogItemsTableOrderingComposer(
+            $db: $db,
+            $table: $db.catalogItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
-class $$MedicationsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $MedicationsTable> {
-  $$MedicationsTableAnnotationComposer({
+class $$TrackedMedicationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TrackedMedicationsTable> {
+  $$TrackedMedicationsTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -4011,6 +4278,29 @@ class $$MedicationsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$CatalogItemsTableAnnotationComposer get catalogItemId {
+    final $$CatalogItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.catalogItemId,
+      referencedTable: $db.catalogItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CatalogItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.catalogItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<T> schedulesRefs<T extends Object>(
     Expression<T> Function($$SchedulesTableAnnotationComposer a) f,
@@ -4063,35 +4353,45 @@ class $$MedicationsTableAnnotationComposer
   }
 }
 
-class $$MedicationsTableTableManager
+class $$TrackedMedicationsTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $MedicationsTable,
-          Medication,
-          $$MedicationsTableFilterComposer,
-          $$MedicationsTableOrderingComposer,
-          $$MedicationsTableAnnotationComposer,
-          $$MedicationsTableCreateCompanionBuilder,
-          $$MedicationsTableUpdateCompanionBuilder,
-          (Medication, $$MedicationsTableReferences),
-          Medication,
-          PrefetchHooks Function({bool schedulesRefs, bool intakeLogsRefs})
+          $TrackedMedicationsTable,
+          TrackedMedication,
+          $$TrackedMedicationsTableFilterComposer,
+          $$TrackedMedicationsTableOrderingComposer,
+          $$TrackedMedicationsTableAnnotationComposer,
+          $$TrackedMedicationsTableCreateCompanionBuilder,
+          $$TrackedMedicationsTableUpdateCompanionBuilder,
+          (TrackedMedication, $$TrackedMedicationsTableReferences),
+          TrackedMedication,
+          PrefetchHooks Function({
+            bool catalogItemId,
+            bool schedulesRefs,
+            bool intakeLogsRefs,
+          })
         > {
-  $$MedicationsTableTableManager(_$AppDatabase db, $MedicationsTable table)
-    : super(
+  $$TrackedMedicationsTableTableManager(
+    _$AppDatabase db,
+    $TrackedMedicationsTable table,
+  ) : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$MedicationsTableFilterComposer($db: db, $table: table),
+              $$TrackedMedicationsTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$MedicationsTableOrderingComposer($db: db, $table: table),
+              $$TrackedMedicationsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$MedicationsTableAnnotationComposer($db: db, $table: table),
+              $$TrackedMedicationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<String?> catalogItemId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> category = const Value.absent(),
                 Value<String?> dosage = const Value.absent(),
@@ -4103,8 +4403,9 @@ class $$MedicationsTableTableManager
                 Value<bool> archived = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
-              }) => MedicationsCompanion(
+              }) => TrackedMedicationsCompanion(
                 id: id,
+                catalogItemId: catalogItemId,
                 name: name,
                 category: category,
                 dosage: dosage,
@@ -4120,6 +4421,7 @@ class $$MedicationsTableTableManager
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<String?> catalogItemId = const Value.absent(),
                 required String name,
                 Value<String?> category = const Value.absent(),
                 Value<String?> dosage = const Value.absent(),
@@ -4131,8 +4433,9 @@ class $$MedicationsTableTableManager
                 Value<bool> archived = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
-              }) => MedicationsCompanion.insert(
+              }) => TrackedMedicationsCompanion.insert(
                 id: id,
+                catalogItemId: catalogItemId,
                 name: name,
                 category: category,
                 dosage: dosage,
@@ -4149,32 +4452,69 @@ class $$MedicationsTableTableManager
               .map(
                 (e) => (
                   e.readTable(table),
-                  $$MedicationsTableReferences(db, table, e),
+                  $$TrackedMedicationsTableReferences(db, table, e),
                 ),
               )
               .toList(),
           prefetchHooksCallback:
-              ({schedulesRefs = false, intakeLogsRefs = false}) {
+              ({
+                catalogItemId = false,
+                schedulesRefs = false,
+                intakeLogsRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (schedulesRefs) db.schedules,
                     if (intakeLogsRefs) db.intakeLogs,
                   ],
-                  addJoins: null,
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (catalogItemId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.catalogItemId,
+                                    referencedTable:
+                                        $$TrackedMedicationsTableReferences
+                                            ._catalogItemIdTable(db),
+                                    referencedColumn:
+                                        $$TrackedMedicationsTableReferences
+                                            ._catalogItemIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
                   getPrefetchedDataCallback: (items) async {
                     return [
                       if (schedulesRefs)
                         await $_getPrefetchedData<
-                          Medication,
-                          $MedicationsTable,
+                          TrackedMedication,
+                          $TrackedMedicationsTable,
                           Schedule
                         >(
                           currentTable: table,
-                          referencedTable: $$MedicationsTableReferences
+                          referencedTable: $$TrackedMedicationsTableReferences
                               ._schedulesRefsTable(db),
                           managerFromTypedResult: (p0) =>
-                              $$MedicationsTableReferences(
+                              $$TrackedMedicationsTableReferences(
                                 db,
                                 table,
                                 p0,
@@ -4187,15 +4527,15 @@ class $$MedicationsTableTableManager
                         ),
                       if (intakeLogsRefs)
                         await $_getPrefetchedData<
-                          Medication,
-                          $MedicationsTable,
+                          TrackedMedication,
+                          $TrackedMedicationsTable,
                           IntakeLog
                         >(
                           currentTable: table,
-                          referencedTable: $$MedicationsTableReferences
+                          referencedTable: $$TrackedMedicationsTableReferences
                               ._intakeLogsRefsTable(db),
                           managerFromTypedResult: (p0) =>
-                              $$MedicationsTableReferences(
+                              $$TrackedMedicationsTableReferences(
                                 db,
                                 table,
                                 p0,
@@ -4214,19 +4554,23 @@ class $$MedicationsTableTableManager
       );
 }
 
-typedef $$MedicationsTableProcessedTableManager =
+typedef $$TrackedMedicationsTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $MedicationsTable,
-      Medication,
-      $$MedicationsTableFilterComposer,
-      $$MedicationsTableOrderingComposer,
-      $$MedicationsTableAnnotationComposer,
-      $$MedicationsTableCreateCompanionBuilder,
-      $$MedicationsTableUpdateCompanionBuilder,
-      (Medication, $$MedicationsTableReferences),
-      Medication,
-      PrefetchHooks Function({bool schedulesRefs, bool intakeLogsRefs})
+      $TrackedMedicationsTable,
+      TrackedMedication,
+      $$TrackedMedicationsTableFilterComposer,
+      $$TrackedMedicationsTableOrderingComposer,
+      $$TrackedMedicationsTableAnnotationComposer,
+      $$TrackedMedicationsTableCreateCompanionBuilder,
+      $$TrackedMedicationsTableUpdateCompanionBuilder,
+      (TrackedMedication, $$TrackedMedicationsTableReferences),
+      TrackedMedication,
+      PrefetchHooks Function({
+        bool catalogItemId,
+        bool schedulesRefs,
+        bool intakeLogsRefs,
+      })
     >;
 typedef $$SchedulesTableCreateCompanionBuilder =
     SchedulesCompanion Function({
@@ -4267,17 +4611,20 @@ final class $$SchedulesTableReferences
     extends BaseReferences<_$AppDatabase, $SchedulesTable, Schedule> {
   $$SchedulesTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static $MedicationsTable _medicationIdTable(_$AppDatabase db) =>
-      db.medications.createAlias(
-        $_aliasNameGenerator(db.schedules.medicationId, db.medications.id),
+  static $TrackedMedicationsTable _medicationIdTable(_$AppDatabase db) =>
+      db.trackedMedications.createAlias(
+        $_aliasNameGenerator(
+          db.schedules.medicationId,
+          db.trackedMedications.id,
+        ),
       );
 
-  $$MedicationsTableProcessedTableManager get medicationId {
+  $$TrackedMedicationsTableProcessedTableManager get medicationId {
     final $_column = $_itemColumn<int>('medication_id')!;
 
-    final manager = $$MedicationsTableTableManager(
+    final manager = $$TrackedMedicationsTableTableManager(
       $_db,
-      $_db.medications,
+      $_db.trackedMedications,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_medicationIdTable($_db));
     if (item == null) return manager;
@@ -4407,20 +4754,20 @@ class $$SchedulesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  $$MedicationsTableFilterComposer get medicationId {
-    final $$MedicationsTableFilterComposer composer = $composerBuilder(
+  $$TrackedMedicationsTableFilterComposer get medicationId {
+    final $$TrackedMedicationsTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.medicationId,
-      referencedTable: $db.medications,
+      referencedTable: $db.trackedMedications,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$MedicationsTableFilterComposer(
+          }) => $$TrackedMedicationsTableFilterComposer(
             $db: $db,
-            $table: $db.medications,
+            $table: $db.trackedMedications,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -4555,20 +4902,20 @@ class $$SchedulesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  $$MedicationsTableOrderingComposer get medicationId {
-    final $$MedicationsTableOrderingComposer composer = $composerBuilder(
+  $$TrackedMedicationsTableOrderingComposer get medicationId {
+    final $$TrackedMedicationsTableOrderingComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.medicationId,
-      referencedTable: $db.medications,
+      referencedTable: $db.trackedMedications,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$MedicationsTableOrderingComposer(
+          }) => $$TrackedMedicationsTableOrderingComposer(
             $db: $db,
-            $table: $db.medications,
+            $table: $db.trackedMedications,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -4640,26 +4987,27 @@ class $$SchedulesTableAnnotationComposer
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
-  $$MedicationsTableAnnotationComposer get medicationId {
-    final $$MedicationsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.medicationId,
-      referencedTable: $db.medications,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$MedicationsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.medications,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
+  $$TrackedMedicationsTableAnnotationComposer get medicationId {
+    final $$TrackedMedicationsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.medicationId,
+          referencedTable: $db.trackedMedications,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
                 $removeJoinBuilderFromRootComposer,
-          ),
-    );
+              }) => $$TrackedMedicationsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.trackedMedications,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
     return composer;
   }
 
@@ -4962,17 +5310,20 @@ final class $$IntakeLogsTableReferences
     extends BaseReferences<_$AppDatabase, $IntakeLogsTable, IntakeLog> {
   $$IntakeLogsTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static $MedicationsTable _medicationIdTable(_$AppDatabase db) =>
-      db.medications.createAlias(
-        $_aliasNameGenerator(db.intakeLogs.medicationId, db.medications.id),
+  static $TrackedMedicationsTable _medicationIdTable(_$AppDatabase db) =>
+      db.trackedMedications.createAlias(
+        $_aliasNameGenerator(
+          db.intakeLogs.medicationId,
+          db.trackedMedications.id,
+        ),
       );
 
-  $$MedicationsTableProcessedTableManager get medicationId {
+  $$TrackedMedicationsTableProcessedTableManager get medicationId {
     final $_column = $_itemColumn<int>('medication_id')!;
 
-    final manager = $$MedicationsTableTableManager(
+    final manager = $$TrackedMedicationsTableTableManager(
       $_db,
-      $_db.medications,
+      $_db.trackedMedications,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_medicationIdTable($_db));
     if (item == null) return manager;
@@ -5051,20 +5402,20 @@ class $$IntakeLogsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  $$MedicationsTableFilterComposer get medicationId {
-    final $$MedicationsTableFilterComposer composer = $composerBuilder(
+  $$TrackedMedicationsTableFilterComposer get medicationId {
+    final $$TrackedMedicationsTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.medicationId,
-      referencedTable: $db.medications,
+      referencedTable: $db.trackedMedications,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$MedicationsTableFilterComposer(
+          }) => $$TrackedMedicationsTableFilterComposer(
             $db: $db,
-            $table: $db.medications,
+            $table: $db.trackedMedications,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -5147,20 +5498,20 @@ class $$IntakeLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  $$MedicationsTableOrderingComposer get medicationId {
-    final $$MedicationsTableOrderingComposer composer = $composerBuilder(
+  $$TrackedMedicationsTableOrderingComposer get medicationId {
+    final $$TrackedMedicationsTableOrderingComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.medicationId,
-      referencedTable: $db.medications,
+      referencedTable: $db.trackedMedications,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$MedicationsTableOrderingComposer(
+          }) => $$TrackedMedicationsTableOrderingComposer(
             $db: $db,
-            $table: $db.medications,
+            $table: $db.trackedMedications,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -5231,26 +5582,27 @@ class $$IntakeLogsTableAnnotationComposer
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
-  $$MedicationsTableAnnotationComposer get medicationId {
-    final $$MedicationsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.medicationId,
-      referencedTable: $db.medications,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$MedicationsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.medications,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
+  $$TrackedMedicationsTableAnnotationComposer get medicationId {
+    final $$TrackedMedicationsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.medicationId,
+          referencedTable: $db.trackedMedications,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
                 $removeJoinBuilderFromRootComposer,
-          ),
-    );
+              }) => $$TrackedMedicationsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.trackedMedications,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
     return composer;
   }
 
@@ -5775,8 +6127,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$CatalogItemsTableTableManager get catalogItems =>
       $$CatalogItemsTableTableManager(_db, _db.catalogItems);
-  $$MedicationsTableTableManager get medications =>
-      $$MedicationsTableTableManager(_db, _db.medications);
+  $$TrackedMedicationsTableTableManager get trackedMedications =>
+      $$TrackedMedicationsTableTableManager(_db, _db.trackedMedications);
   $$SchedulesTableTableManager get schedules =>
       $$SchedulesTableTableManager(_db, _db.schedules);
   $$IntakeLogsTableTableManager get intakeLogs =>

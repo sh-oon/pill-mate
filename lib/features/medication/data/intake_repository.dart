@@ -165,7 +165,7 @@ DateTime combineDateAndTime(DateTime date, String hhmm) {
 /// 로그 list와 매칭해서 상태/logId 채워 반환.
 List<DoseInstance> computeDosesForDay({
   required DateTime date,
-  required List<Medication> meds,
+  required List<TrackedMedication> meds,
   required List<Schedule> schedules,
   required List<IntakeLog> logs,
   DateTime? now,
@@ -174,7 +174,7 @@ List<DoseInstance> computeDosesForDay({
   final nowTime = now ?? DateTime.now();
   final isToday = _dateOnly(date) == _dateOnly(nowTime);
 
-  String quantityOf(Medication m) {
+  String quantityOf(TrackedMedication m) {
     final d = m.dosage, u = m.unit;
     if (d != null && u != null) return '$d$u';
     if (d != null) return d;
