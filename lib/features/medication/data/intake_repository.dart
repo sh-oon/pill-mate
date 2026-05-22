@@ -107,6 +107,24 @@ class IntakeRepository {
     await _notif.syncSchedulesFor(medicationId);
   }
 
+  /// 주어진 [scheduleIds] 중 [day] 하루(자정~익일 자정) 범위의 IntakeLog 조회.
+  ///
+  /// past-dose-edit backfill 후보에서 "이미 logged된 슬롯" 가드용.
+  /// scheduleIds 빈 입력은 short-circuit.
+  Future<List<IntakeLog>> logsAt({
+    required List<int> scheduleIds,
+    required DateTime day,
+  }) {
+    if (scheduleIds.isEmpty) return Future.value(const []);
+    final start = DateTime(day.year, day.month, day.day);
+    final end = start.add(const Duration(days: 1));
+    return (_db.select(_db.intakeLogs)
+          ..where((l) =>
+              l.scheduleId.isIn(scheduleIds) &
+              l.scheduledAt.isBetweenValues(start, end)))
+        .get();
+  }
+
   Future<void> markTaken({
     required int medicationId,
     required int scheduleId,

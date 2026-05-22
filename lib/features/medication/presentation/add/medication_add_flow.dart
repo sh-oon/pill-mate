@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/database/database_providers.dart';
 import '../../../../core/database/tables/schedules.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_buttons.dart';
+import '../../../../core/widgets/sheets/past_doses_backfill_sheet.dart';
 import '../../../../core/widgets/sheets/time_picker_sheet.dart';
 import '../../data/intake_providers.dart';
+import '../../data/intake_repository.dart';
 import '../../data/medication_providers.dart';
 import '../../data/medication_repository.dart';
+import 'past_dose_slot.dart';
 import 'steps/step1_category.dart';
 import 'steps/step2_name.dart';
 import 'steps/step3_schedule.dart';
@@ -178,7 +182,15 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
         remindBeforeMinutes: _remindBeforeMinutes,
       );
 
+      // backfill sheet에 표시할 수량 라벨 — computeDosesForDay.quantityOf와 동일 규칙.
+      final qDosage = draft.customDosage ?? catalogItem?.defaultDosage;
+      final qUnit = draft.customUnit ?? catalogItem?.defaultUnit;
+      final quantityLabel = (qDosage != null && qUnit != null)
+          ? '$qDosage$qUnit'
+          : (qDosage ?? '1정');
+
       if (_isEdit) {
+        // 편집 모드는 backfill 대상 아님(Plan §3.2 — 편집은 dosage/메모 변경이 주).
         await repo.updateWithSchedules(widget.medicationId!, draft);
       } else {
         // catalog ↔ tracked 1:1: 동일 catalog가 이미 있으면 사용자에게 묻고
@@ -196,7 +208,7 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
           }
           // 기존 times ∪ 새 times로 schedules 재구성.
           final mergedTimes = {...existing.times, ..._times}.toList()..sort();
-          await repo.updateWithSchedules(
+          final scheduleIds = await repo.updateWithSchedules(
             existing.medication.id,
             TrackedMedicationDraft(
               catalogItemId: draft.catalogItemId,
@@ -210,6 +222,12 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
               remindBeforeMinutes: draft.remindBeforeMinutes,
             ),
           );
+          await _maybeBackfillTodayPast(
+            medicationId: existing.medication.id,
+            scheduleIds: scheduleIds,
+            medName: name,
+            quantityLabel: quantityLabel,
+          );
           ref.invalidate(todayLogsProvider);
           ref.invalidate(trackedMedicationsStreamProvider);
           ref.invalidate(
@@ -221,7 +239,13 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
           context.pop();
           return;
         }
-        await repo.insertWithSchedules(draft);
+        final inserted = await repo.insertWithSchedules(draft);
+        await _maybeBackfillTodayPast(
+          medicationId: inserted.medicationId,
+          scheduleIds: inserted.scheduleIds,
+          medName: name,
+          quantityLabel: quantityLabel,
+        );
       }
       // 명시적 invalidate — stream re-emit이 timing 이슈로 누락되거나
       // 늦게 도착할 때 UI가 stale 데이터를 보여주는 케이스 방어.
@@ -241,6 +265,98 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('저장 실패: $e')),
       );
+    }
+  }
+
+  /// 신규 등록/시각 추가 직후 호출되는 backfill 단계.
+  ///
+  /// 후보 산출: 오늘의 schedule rows 중
+  ///   1) scheduledAt < now
+  ///   2) isScheduleActiveOn(today)
+  ///   3) IntakeLog 부재
+  /// 후보 ≥ 1이면 [PastDosesBackfillSheet]로 사용자 확인 → 선택 슬롯에
+  /// `markTaken` 일괄. 등록 트랜잭션은 이미 commit이므로 부분 실패 허용.
+  ///
+  /// `_isEdit=true` 경로는 호출하지 않음(Plan §3.2).
+  Future<void> _maybeBackfillTodayPast({
+    required int medicationId,
+    required List<int> scheduleIds,
+    required String medName,
+    required String quantityLabel,
+  }) async {
+    if (scheduleIds.isEmpty) return;
+    if (!mounted) return;
+
+    try {
+      final db = ref.read(appDatabaseProvider);
+      final intakeRepo = ref.read(intakeRepositoryProvider);
+
+      // 1) schedule rows 재조회 — startDate/repeatKind/mask/interval/timeOfDay 필요.
+      final schedules = await (db.select(db.schedules)
+            ..where((s) => s.id.isIn(scheduleIds)))
+          .get();
+
+      final now = DateTime.now();
+      final dayKey = DateTime(now.year, now.month, now.day);
+
+      // 2) 후보 1차 필터.
+      final candidates = <PastDoseSlot>[];
+      for (final s in schedules) {
+        final scheduledAt = combineDateAndTime(dayKey, s.timeOfDay);
+        if (!scheduledAt.isBefore(now)) continue;
+        if (!isScheduleActiveOn(s, dayKey)) continue;
+        candidates.add(PastDoseSlot(
+          medicationId: medicationId,
+          scheduleId: s.id,
+          timeOfDay: s.timeOfDay,
+          scheduledAt: scheduledAt,
+        ));
+      }
+      if (candidates.isEmpty) return;
+
+      // 3) IntakeLog 부재 가드 — 시각 추가 경로에서 기존 슬롯이
+      //    이미 logged 상태인 경우 노출 제외.
+      final existingLogs = await intakeRepo.logsAt(
+        scheduleIds: candidates.map((c) => c.scheduleId).toList(),
+        day: dayKey,
+      );
+      final loggedKeys = existingLogs
+          .map((l) => '${l.scheduleId}|${l.scheduledAt.toIso8601String()}')
+          .toSet();
+      final slots = candidates
+          .where((c) => !loggedKeys.contains(
+              '${c.scheduleId}|${c.scheduledAt.toIso8601String()}'))
+          .toList();
+      if (slots.isEmpty) return;
+
+      // 4) sheet 호출.
+      if (!mounted) return;
+      final selected = await PastDosesBackfillSheet.show(
+        context,
+        slots: slots,
+        medName: medName,
+        quantityLabel: quantityLabel,
+      );
+      if (selected == null || selected.isEmpty) return;
+
+      // 5) batch markTaken — 부분 실패 허용(등록은 이미 성공).
+      for (final i in selected) {
+        final slot = slots[i];
+        try {
+          await intakeRepo.markTaken(
+            medicationId: slot.medicationId,
+            scheduleId: slot.scheduleId,
+            scheduledAt: slot.scheduledAt,
+          );
+        } catch (e, st) {
+          // ignore: avoid_print
+          print('past-dose-edit markTaken failed for slot $slot: $e\n$st');
+        }
+      }
+    } catch (e, st) {
+      // 등록 자체는 이미 성공 — backfill 단계 실패는 silent(로그만).
+      // ignore: avoid_print
+      print('past-dose-edit backfill stage failed: $e\n$st');
     }
   }
 

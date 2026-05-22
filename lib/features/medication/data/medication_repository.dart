@@ -358,8 +358,10 @@ class TrackedMedicationRepository {
     return id;
   }
 
-  Future<int> insertWithSchedules(TrackedMedicationDraft draft) async {
-    final medId = await _db.transaction(() async {
+  Future<({int medicationId, List<int> scheduleIds})> insertWithSchedules(
+    TrackedMedicationDraft draft,
+  ) async {
+    final result = await _db.transaction(() async {
       // catalog ↔ tracked 1:1 — 같은 catalog가 이미 있으면 caller가
       // updateWithSchedules로 분기하도록 명시적 throw.
       final existing = await (_db.select(_db.trackedMedications)
@@ -386,8 +388,9 @@ class TrackedMedicationRepository {
       // 이전의 슬롯들이 active로 잡혀 놓침으로 카운트되는 버그.
       final now = DateTime.now();
       // 시각 dedup — UI에서 막지만 방어. legacy draft에 중복 들어오는 경우도 케이스.
+      final scheduleIds = <int>[];
       for (final t in draft.times.toSet()) {
-        await _db.into(_db.schedules).insert(
+        final sid = await _db.into(_db.schedules).insert(
               SchedulesCompanion.insert(
                 medicationId: id,
                 timeOfDay: t,
@@ -398,11 +401,12 @@ class TrackedMedicationRepository {
                 remindBeforeMinutes: Value(draft.remindBeforeMinutes),
               ),
             );
+        scheduleIds.add(sid);
       }
-      return id;
+      return (medicationId: id, scheduleIds: scheduleIds);
     });
-    await _notif.syncSchedulesFor(medId);
-    return medId;
+    await _notif.syncSchedulesFor(result.medicationId);
+    return result;
   }
 
   /// 기존 약 수정. 스케줄은 통째로 교체 + 알림 재동기화.
@@ -410,8 +414,11 @@ class TrackedMedicationRepository {
   /// Phase 2C: catalog FK 자체는 호출자가 [resolveOrCreateCatalog]로 사전 확정.
   /// 기존 catalog와 다른 id로 변경되면 relink 효과. 같으면 in-place 갱신.
   /// catalog 자체 mutate는 하지 않음(다른 tracked가 공유 가능).
-  Future<void> updateWithSchedules(int id, TrackedMedicationDraft draft) async {
-    await _db.transaction(() async {
+  Future<List<int>> updateWithSchedules(
+    int id,
+    TrackedMedicationDraft draft,
+  ) async {
+    final scheduleIds = await _db.transaction(() async {
       // tracked 업데이트 (catalogItemId 포함 relink).
       await (_db.update(_db.trackedMedications)..where((m) => m.id.equals(id)))
           .write(
@@ -430,8 +437,9 @@ class TrackedMedicationRepository {
       // insertWithSchedules와 동일 — startDate는 시각까지 보존.
       final now = DateTime.now();
       // 시각 dedup — UI에서 막지만 방어. legacy draft에 중복 들어오는 경우도 케이스.
+      final sids = <int>[];
       for (final t in draft.times.toSet()) {
-        await _db.into(_db.schedules).insert(
+        final sid = await _db.into(_db.schedules).insert(
               SchedulesCompanion.insert(
                 medicationId: id,
                 timeOfDay: t,
@@ -442,12 +450,15 @@ class TrackedMedicationRepository {
                 remindBeforeMinutes: Value(draft.remindBeforeMinutes),
               ),
             );
+        sids.add(sid);
       }
 
       // relink로 이전 catalog가 고아 됐을 수 있음 → 정리.
       await _cleanupOrphanUserCatalogs();
+      return sids;
     });
     await _notif.syncSchedulesFor(id);
+    return scheduleIds;
   }
 
   /// tracked + schedules 삭제. intake_logs는 **보존** (v6 setNull 정책):
