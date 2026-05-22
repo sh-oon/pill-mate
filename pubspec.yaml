@@ -2,7 +2,7 @@ name: pill_mate
 description: "필메이트 - Offline medication and supplement tracker with local notifications, calendar and reports"
 publish_to: 'none'
 
-version: 1.0.0+4
+version: 1.1.0+5
 
 environment:
   sdk: ^3.9.0
