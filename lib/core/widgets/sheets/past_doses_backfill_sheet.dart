@@ -9,15 +9,14 @@ import '../app_buttons.dart';
 ///
 /// caller(`medication_add_flow._maybeBackfillTodayPast`)가 후보 슬롯을 사전
 /// 필터(오늘 + scheduledAt < now + isScheduleActiveOn + IntakeLog 부재)해
-/// 전달. 시트는 선택만 담당 — DB write는 caller가 `IntakeRepository.markTaken`
-/// 으로 일괄 처리.
+/// 전달. 시트는 선택만 담당 — DB write는 caller가 일괄 처리.
 ///
-/// 반환:
-///   - `Set<int>`: 선택된 [slots] 인덱스
-///   - `null`   : barrier dismiss / swipe down
-///   - 빈 `Set` : "건너뛰기" 또는 아무것도 안 고르고 "기록할게요"
-///
-/// caller는 `null`과 빈 Set을 동등 처리(어차피 mark 호출 0회).
+/// 반환 의미(commit semantics — 어떤 경로든 결정으로 간주):
+///   - `Set<int>`(비었거나 일부): "기록할게요" — 선택된 인덱스는 taken,
+///     나머지 후보는 missed로 기록
+///   - 빈 `Set` 그대로지만 caller가 구분 못함 — "안 챙겼어요" 버튼도 빈 Set 반환
+///   - `null`: barrier dismiss / swipe down — caller는 빈 Set과 동일 처리
+///     (전부 missed). pending 유지 escape hatch 없음 — 등록 시점에 결정 강제.
 class PastDosesBackfillSheet extends StatefulWidget {
   const PastDosesBackfillSheet._({
     required this.slots,
@@ -109,7 +108,7 @@ class _PastDosesBackfillSheetState extends State<PastDosesBackfillSheet> {
               children: [
                 Expanded(
                   child: AppButton(
-                    label: '건너뛰기',
+                    label: '안 챙겼어요',
                     variant: AppButtonVariant.primaryTint,
                     fullWidth: true,
                     onPressed: () =>

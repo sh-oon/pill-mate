@@ -148,6 +148,23 @@ class IntakeRepository {
         scheduledAt: scheduledAt,
         status: IntakeStatus.skipped,
       );
+
+  /// 사용자가 명시적으로 "안 챙겼어요"를 선택한 슬롯에 missed 기록.
+  ///
+  /// past-dose-edit backfill 경로에서 사용 — 등록 시점에 사용자가
+  /// 본 sheet에서 commit한 결정이므로 자동 missed가 아닌 명시 missed.
+  /// 리포트에 missed로 정확히 카운트됨.
+  Future<void> markMissed({
+    required int medicationId,
+    required int scheduleId,
+    required DateTime scheduledAt,
+  }) =>
+      mark(
+        medicationId: medicationId,
+        scheduleId: scheduleId,
+        scheduledAt: scheduledAt,
+        status: IntakeStatus.missed,
+      );
 }
 
 // =============================================================================

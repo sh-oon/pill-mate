@@ -274,8 +274,14 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
   ///   1) scheduledAt < now
   ///   2) isScheduleActiveOn(today)
   ///   3) IntakeLog 부재
-  /// 후보 ≥ 1이면 [PastDosesBackfillSheet]로 사용자 확인 → 선택 슬롯에
-  /// `markTaken` 일괄. 등록 트랜잭션은 이미 commit이므로 부분 실패 허용.
+  /// 후보 ≥ 1이면 `PastDosesBackfillSheet`로 사용자에게 결정 요청.
+  ///
+  /// Commit semantics(등록 시점 강제 결정 — pending 폴백 금지):
+  ///   - sheet에서 선택한 슬롯 → markTaken
+  ///   - sheet에서 미선택 슬롯 → markMissed
+  ///   - "안 챙겼어요" → 빈 Set 반환 → 전체 missed
+  ///   - dismiss(swipe/barrier) → null 반환 → 빈 Set과 동등 → 전체 missed
+  /// 등록 트랜잭션은 이미 commit이므로 부분 실패 허용.
   ///
   /// `_isEdit=true` 경로는 호출하지 않음(Plan §3.2).
   Future<void> _maybeBackfillTodayPast({
@@ -329,28 +335,37 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
           .toList();
       if (slots.isEmpty) return;
 
-      // 4) sheet 호출.
+      // 4) sheet 호출 — null(dismiss)도 commit으로 간주(전체 missed).
       if (!mounted) return;
-      final selected = await PastDosesBackfillSheet.show(
-        context,
-        slots: slots,
-        medName: medName,
-        quantityLabel: quantityLabel,
-      );
-      if (selected == null || selected.isEmpty) return;
+      final selected =
+          (await PastDosesBackfillSheet.show(
+                context,
+                slots: slots,
+                medName: medName,
+                quantityLabel: quantityLabel,
+              )) ??
+              const <int>{};
 
-      // 5) batch markTaken — 부분 실패 허용(등록은 이미 성공).
-      for (final i in selected) {
+      // 5) batch commit — 선택=taken, 미선택=missed. 부분 실패 허용.
+      for (var i = 0; i < slots.length; i++) {
         final slot = slots[i];
         try {
-          await intakeRepo.markTaken(
-            medicationId: slot.medicationId,
-            scheduleId: slot.scheduleId,
-            scheduledAt: slot.scheduledAt,
-          );
+          if (selected.contains(i)) {
+            await intakeRepo.markTaken(
+              medicationId: slot.medicationId,
+              scheduleId: slot.scheduleId,
+              scheduledAt: slot.scheduledAt,
+            );
+          } else {
+            await intakeRepo.markMissed(
+              medicationId: slot.medicationId,
+              scheduleId: slot.scheduleId,
+              scheduledAt: slot.scheduledAt,
+            );
+          }
         } catch (e, st) {
           // ignore: avoid_print
-          print('past-dose-edit markTaken failed for slot $slot: $e\n$st');
+          print('past-dose-edit commit failed for slot $slot: $e\n$st');
         }
       }
     } catch (e, st) {
