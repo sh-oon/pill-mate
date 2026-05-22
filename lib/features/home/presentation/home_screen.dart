@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -693,7 +696,7 @@ class _MedCard extends StatelessWidget {
   }
 }
 
-class _DoseRow extends StatelessWidget {
+class _DoseRow extends StatefulWidget {
   const _DoseRow({
     required this.dose,
     required this.showTakeButton,
@@ -705,50 +708,121 @@ class _DoseRow extends StatelessWidget {
   final VoidCallback onTaken;
 
   @override
+  State<_DoseRow> createState() => _DoseRowState();
+}
+
+class _DoseRowState extends State<_DoseRow> {
+  /// 복용 완료 직후 행 배경에 잠깐 success-tint를 깔아 시각 피드백.
+  /// Stream 갱신으로 status가 taken으로 바뀌어 버튼→배지로 전환되는 동안에도
+  /// 사용자에게 “기록됐다”는 신호.
+  bool _flashing = false;
+  Timer? _flashTimer;
+
+  @override
+  void dispose() {
+    _flashTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handleTaken() {
+    // 1) 즉시 햅틱 — 액션 확정 피드백.
+    HapticFeedback.lightImpact();
+    // 2) 행 success flash 트리거 — Stack 오버레이로 layout 영향 없음.
+    setState(() => _flashing = true);
+    _flashTimer?.cancel();
+    _flashTimer = Timer(const Duration(milliseconds: 650), () {
+      if (!mounted) return;
+      setState(() => _flashing = false);
+    });
+    // 3) 실제 markTaken — Stream이 갱신되면 부모가 rebuild하면서 widget.showTakeButton
+    //    이 false로 바뀌고 AnimatedSwitcher가 부드럽게 배지로 전환.
+    widget.onTaken();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Row(
+    final dose = widget.dose;
+    return Stack(
+      fit: StackFit.passthrough,
       children: [
-        PillIcon.svg(medName: dose.medicationName),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      dose.medicationName,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textStrong,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  CategoryChip.fromCode(dose.category ?? 'sup'),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                dose.quantityLabel,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
+        // Flash overlay — layout에 영향 주지 않게 Stack/Positioned.fill.
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: _flashing ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOut,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.successTint,
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-            ],
+            ),
           ),
         ),
-        const SizedBox(width: 8),
-        showTakeButton
-            ? AppButton(
-                label: '먹었어요',
-                onPressed: onTaken,
-                size: AppButtonSize.sm,
-              )
-            : StatusBadge(status: _toBadgeStatus(dose.status)),
+        Row(
+          children: [
+            PillIcon.svg(medName: dose.medicationName),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          dose.medicationName,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textStrong,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      CategoryChip.fromCode(dose.category ?? 'sup'),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    dose.quantityLabel,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // 버튼 ↔ 배지 전환을 부드럽게. key로 child identity 명시.
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.85, end: 1.0).animate(anim),
+                  child: child,
+                ),
+              ),
+              child: widget.showTakeButton
+                  ? AppButton(
+                      key: const ValueKey('take-btn'),
+                      label: '먹었어요',
+                      onPressed: _handleTaken,
+                      size: AppButtonSize.sm,
+                    )
+                  : StatusBadge(
+                      key: ValueKey('badge-${dose.status.name}'),
+                      status: _toBadgeStatus(dose.status),
+                    ),
+            ),
+          ],
+        ),
       ],
     );
   }
