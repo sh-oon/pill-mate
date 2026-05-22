@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
 import 'icon_circle_badge.dart';
@@ -42,12 +43,25 @@ class StatGrid4 extends StatelessWidget {
   }
 }
 
-class _Cell extends StatelessWidget {
+class _Cell extends StatefulWidget {
   const _Cell({required this.cell});
   final StatCell cell;
 
   @override
+  State<_Cell> createState() => _CellState();
+}
+
+class _CellState extends State<_Cell> {
+  bool _pressed = false;
+
+  void _setPressed(bool v) {
+    if (_pressed == v) return;
+    setState(() => _pressed = v);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final cell = widget.cell;
     final body = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       child: Column(
@@ -85,10 +99,35 @@ class _Cell extends StatelessWidget {
     );
 
     if (cell.onTap == null) return body;
-    return InkWell(
+
+    // 탭 피드백: scale-down + 햅틱 + 살짝 옅은 배경 highlight.
+    // - down: 즉시 visual + haptic (selectionClick — 부드러운 선택 진동).
+    // - up/cancel: scale 원복. onTap에서 cell.onTap 호출.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) {
+        _setPressed(true);
+        HapticFeedback.selectionClick();
+      },
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
       onTap: cell.onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: body,
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOut,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            color: _pressed
+                ? Colors.white.withValues(alpha: 0.45)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: body,
+        ),
+      ),
     );
   }
 }
