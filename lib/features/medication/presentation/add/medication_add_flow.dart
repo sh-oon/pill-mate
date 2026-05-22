@@ -58,10 +58,10 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
         .getById(widget.medicationId!);
     if (m == null || !mounted) return;
     setState(() {
-      _category = m.medication.category ?? 'sup';
-      _name = m.medication.name;
-      _dosage = m.medication.dosage ?? m.catalog?.defaultDosage ?? '';
-      _unit = m.medication.unit ?? m.catalog?.defaultUnit ?? '';
+      _category = m.displayCategory ?? 'sup';
+      _name = m.displayName;
+      _dosage = m.displayDosage ?? '';
+      _unit = m.displayUnit ?? '';
       _memo = m.medication.memo ?? '';
       // legacy DB에 중복 시각이 있을 수 있어 prefill 시 dedup.
       _times
@@ -134,26 +134,93 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
       'interval' => RepeatKind.interval,
       _ => RepeatKind.daily,
     };
-    final draft = TrackedMedicationDraft(
-      name: _name.trim(),
-      category: _category!,
-      dosage: _dosage.trim().isEmpty ? null : _dosage.trim(),
-      unit: _unit.trim().isEmpty ? null : _unit.trim(),
-      memo: _memo.trim().isEmpty ? null : _memo.trim(),
-      times: _times,
-      repeatKind: repeatKind,
-      // weekly만 mask 저장. daily/interval은 null.
-      daysOfWeekMask:
-          repeatKind == RepeatKind.weekly ? _daysOfWeekMask : null,
-      // interval만 days 저장.
-      intervalDays:
-          repeatKind == RepeatKind.interval ? _intervalDays : null,
-      remindBeforeMinutes: _remindBeforeMinutes,
-    );
+    final name = _name.trim();
+    final category = _category!;
+    final dosage = _dosage.trim().isEmpty ? null : _dosage.trim();
+    final unit = _unit.trim().isEmpty ? null : _unit.trim();
+
     try {
+      // Phase 2C: catalog 메타가 SSOT. 입력된 (name, category)로 catalog를
+      // resolve/생성한 뒤 그 id로 tracked 생성.
+      // catalog의 default_*는 dosage/unit이 비어있을 때만 채움 — 사용자가 명시
+      // 입력하지 않은 값이라면 catalog default를 그대로 신뢰.
+      final catalogId = await repo.resolveOrCreateCatalog(
+        CatalogResolveInput(
+          name: name,
+          category: category,
+          defaultDosage: dosage,
+          defaultUnit: unit,
+        ),
+      );
+
+      // override는 catalog default와 다를 때만 보관 — 마이그레이션 백필 로직과 일관.
+      final catalogItem = await repo.getCatalogById(catalogId);
+      final customDosage = (dosage != null && dosage != catalogItem?.defaultDosage)
+          ? dosage
+          : null;
+      final customUnit = (unit != null && unit != catalogItem?.defaultUnit)
+          ? unit
+          : null;
+
+      final draft = TrackedMedicationDraft(
+        catalogItemId: catalogId,
+        customDosage: customDosage,
+        customUnit: customUnit,
+        memo: _memo.trim().isEmpty ? null : _memo.trim(),
+        times: _times,
+        repeatKind: repeatKind,
+        // weekly만 mask 저장. daily/interval은 null.
+        daysOfWeekMask:
+            repeatKind == RepeatKind.weekly ? _daysOfWeekMask : null,
+        // interval만 days 저장.
+        intervalDays:
+            repeatKind == RepeatKind.interval ? _intervalDays : null,
+        remindBeforeMinutes: _remindBeforeMinutes,
+      );
+
       if (_isEdit) {
         await repo.updateWithSchedules(widget.medicationId!, draft);
       } else {
+        // catalog ↔ tracked 1:1: 동일 catalog가 이미 있으면 사용자에게 묻고
+        // 시각 추가 모드(편집 모드)로 전환. 다른 메타(dosage/unit/memo)는
+        // 사용자가 새로 입력한 값을 덮어쓰는 게 자연스러움 — 같은 catalog의
+        // 단일 인스턴스니까.
+        final existing =
+            await repo.findTrackedByCatalogId(draft.catalogItemId);
+        if (existing != null) {
+          if (!mounted) return;
+          final ok = await _confirmAppendToExisting(existing.times);
+          if (!ok) {
+            setState(() => _saving = false);
+            return;
+          }
+          // 기존 times ∪ 새 times로 schedules 재구성.
+          final mergedTimes = {...existing.times, ..._times}.toList()..sort();
+          await repo.updateWithSchedules(
+            existing.medication.id,
+            TrackedMedicationDraft(
+              catalogItemId: draft.catalogItemId,
+              customDosage: draft.customDosage,
+              customUnit: draft.customUnit,
+              memo: draft.memo,
+              times: mergedTimes,
+              repeatKind: draft.repeatKind,
+              daysOfWeekMask: draft.daysOfWeekMask,
+              intervalDays: draft.intervalDays,
+              remindBeforeMinutes: draft.remindBeforeMinutes,
+            ),
+          );
+          ref.invalidate(todayLogsProvider);
+          ref.invalidate(trackedMedicationsStreamProvider);
+          ref.invalidate(
+              trackedMedicationByIdProvider(existing.medication.id));
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('시각을 추가했어요')),
+          );
+          context.pop();
+          return;
+        }
         await repo.insertWithSchedules(draft);
       }
       // 명시적 invalidate — stream re-emit이 timing 이슈로 누락되거나
@@ -175,6 +242,36 @@ class _MedicationAddFlowState extends ConsumerState<MedicationAddFlow> {
         SnackBar(content: Text('저장 실패: $e')),
       );
     }
+  }
+
+  /// 같은 catalog가 이미 등록되어 있을 때 “시각 추가” 분기 confirm 다이얼로그.
+  Future<bool> _confirmAppendToExisting(List<String> existingTimes) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final existing =
+            existingTimes.isEmpty ? '없음' : existingTimes.join(', ');
+        return AlertDialog(
+          title: const Text('이미 등록되어 있어요'),
+          content: Text(
+            '같은 약/영양제가 약 서랍에 있어요.\n'
+            '기존 시각: $existing\n\n'
+            '입력한 시각을 추가할까요?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('시각 추가'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
   }
 
   bool get _canProceed => switch (_step) {

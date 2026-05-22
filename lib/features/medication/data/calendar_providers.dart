@@ -22,11 +22,15 @@ final dayDosesProvider =
     error: (e, st) => Stream.error(e, st),
     data: (medsWithSchedules) {
       final meds = medsWithSchedules.map((m) => m.medication).toList();
+      final catalogByMedId = {
+        for (final m in medsWithSchedules) m.medication.id: m.catalog,
+      };
       final scheds = [for (final m in medsWithSchedules) ...m.schedules];
       return repo.watchRange(start, end).map((logs) {
         return computeDosesForDay(
           date: date,
           meds: meds,
+          catalogByMedId: catalogByMedId,
           schedules: scheds,
           logs: logs,
         );
@@ -93,6 +97,9 @@ final monthMarksProvider = StreamProvider.family
     error: (e, st) => Stream.error(e, st),
     data: (medsWithSchedules) {
       final meds = medsWithSchedules.map((m) => m.medication).toList();
+      final catalogByMedId = {
+        for (final m in medsWithSchedules) m.medication.id: m.catalog,
+      };
       final scheds = [for (final m in medsWithSchedules) ...m.schedules];
 
       return repo.watchRange(first, next).map((logs) {
@@ -102,6 +109,7 @@ final monthMarksProvider = StreamProvider.family
           final doses = computeDosesForDay(
             date: date,
             meds: meds,
+            catalogByMedId: catalogByMedId,
             schedules: scheds,
             logs: logs,
           );

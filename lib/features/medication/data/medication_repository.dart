@@ -41,44 +41,52 @@ class TrackedMedicationWithSchedules {
   int? get remindBeforeMinutes =>
       schedules.isEmpty ? null : schedules.first.remindBeforeMinutes;
 
-  // ── 표시용 헬퍼 (catalog 우선 → tracked 폴백) ──
-  String get displayName => catalog?.name ?? medication.name;
-  String? get displayCategory => catalog?.category ?? medication.category;
-  String? get displayDosage => medication.dosage ?? catalog?.defaultDosage;
-  String? get displayUnit => medication.unit ?? catalog?.defaultUnit;
-  String? get displayShape => catalog?.shape ?? medication.shape;
-  String? get displayColorHex => catalog?.colorHex ?? medication.colorHex;
-  String? get displayIconKey => catalog?.iconKey ?? medication.iconKey;
+  // ── 표시용 헬퍼 (Phase 2C: catalog만이 메타 SSOT. catalog NULL은 legacy) ──
+  /// catalog가 끊긴 legacy tracked의 폴백 텍스트.
+  static const _missingNameFallback = '(이름 없음)';
+
+  String get displayName => catalog?.name ?? _missingNameFallback;
+  String? get displayCategory => catalog?.category;
+  String? get displayDosage => medication.customDosage ?? catalog?.defaultDosage;
+  String? get displayUnit => medication.customUnit ?? catalog?.defaultUnit;
+  String? get displayShape => catalog?.shape;
+  String? get displayColorHex => catalog?.colorHex;
+  String? get displayIconKey => catalog?.iconKey;
 
   /// 알람 활성 schedule이 1개 이상.
   bool get hasAlarm => schedules.isNotEmpty;
 }
 
 /// 신규/수정 시 입력 폼.
+///
+/// Phase 2C: 이름/카테고리/모양/색상/아이콘은 catalog가 SSOT이므로 [catalogItemId]만
+/// 받음. 호출자가 사전에 [TrackedMedicationRepository.resolveOrCreateCatalog]로
+/// catalog id를 확보한 뒤 Draft에 채워 전달.
 class TrackedMedicationDraft {
   const TrackedMedicationDraft({
-    required this.name,
-    required this.category,
+    required this.catalogItemId,
     required this.times,
     required this.repeatKind,
-    this.dosage,
-    this.unit,
+    this.customDosage,
+    this.customUnit,
     this.daysOfWeekMask,
     this.intervalDays,
     this.memo,
     this.remindBeforeMinutes,
   });
 
-  final String name;
+  /// 필수: catalog_items.id (seed slug 또는 user UUID).
+  final String catalogItemId;
 
-  /// 'med' | 'sup'
-  final String category;
+  /// catalog.defaultDosage override. null이면 catalog 값 사용.
+  final String? customDosage;
+
+  /// catalog.defaultUnit override. null이면 catalog 값 사용.
+  final String? customUnit;
 
   /// "HH:mm" list. 비어 있으면 필요시 복용 (PRN).
   final List<String> times;
   final RepeatKind repeatKind;
-  final String? dosage;
-  final String? unit;
   final int? daysOfWeekMask;
   final int? intervalDays;
   final String? memo;
@@ -86,6 +94,41 @@ class TrackedMedicationDraft {
   /// 본 알림 N분 전 사전 알림. null/0이면 OFF.
   /// 약 1개 = 모든 스케줄에 동일 적용.
   final int? remindBeforeMinutes;
+}
+
+/// catalog 검색/생성을 위한 입력. UI step2(name/category 입력)에서
+/// [TrackedMedicationRepository.resolveOrCreateCatalog]에 전달.
+class CatalogResolveInput {
+  const CatalogResolveInput({
+    required this.name,
+    required this.category,
+    this.defaultDosage,
+    this.defaultUnit,
+    this.shape,
+    this.colorHex,
+    this.iconKey,
+  });
+
+  final String name;
+  final String category;
+  final String? defaultDosage;
+  final String? defaultUnit;
+  final String? shape;
+  final String? colorHex;
+  final String? iconKey;
+}
+
+/// catalog ↔ tracked 1:1 제약 위반(같은 catalog로 재등록 시도) 시 발생.
+/// 호출자(add_flow)가 catch해서 “시각 추가” 모드로 분기.
+class DuplicateCatalogTrackedException implements Exception {
+  const DuplicateCatalogTrackedException(this.existingMedicationId);
+
+  /// 이미 등록되어 있는 tracked의 id — 편집 모드 라우팅에 사용.
+  final int existingMedicationId;
+
+  @override
+  String toString() =>
+      'DuplicateCatalogTrackedException(existingId=$existingMedicationId)';
 }
 
 class TrackedMedicationRepository {
@@ -112,7 +155,9 @@ class TrackedMedicationRepository {
       ),
     ])
       ..where(_db.trackedMedications.archived.equals(false))
-      ..orderBy([OrderingTerm(expression: _db.trackedMedications.name)]);
+      // Phase 2C: tracked.name 컬럼 제거 → catalog.name으로 정렬.
+      // catalog가 NULL인 legacy는 정렬 끝(NULL은 SQLite에서 작은 값으로 정렬).
+      ..orderBy([OrderingTerm(expression: _db.catalogItems.name)]);
 
     return query.watch().map((rows) {
       final medsById = <int, TrackedMedication>{};
@@ -224,6 +269,44 @@ class TrackedMedicationRepository {
     await _db.transaction(_cleanupOrphanUserCatalogs);
   }
 
+  /// catalog 단일 fetch — 등록 플로우에서 override 비교용으로 사용.
+  Future<CatalogItem?> getCatalogById(String id) {
+    return (_db.select(_db.catalogItems)..where((c) => c.id.equals(id)))
+        .getSingleOrNull();
+  }
+
+  /// 주어진 catalog로 이미 등록된 tracked가 있는지 조회 (catalog ↔ tracked 1:1).
+  /// 등록 플로우에서 step2 catalog 선택 후 호출 — 있으면 “시각 추가” 분기.
+  Future<TrackedMedicationWithSchedules?> findTrackedByCatalogId(
+      String catalogId) async {
+    final rows = await (_db.select(_db.trackedMedications).join([
+      leftOuterJoin(
+        _db.catalogItems,
+        _db.catalogItems.id.equalsExp(_db.trackedMedications.catalogItemId),
+      ),
+      leftOuterJoin(
+        _db.schedules,
+        _db.schedules.medicationId.equalsExp(_db.trackedMedications.id),
+      ),
+    ])
+          ..where(_db.trackedMedications.catalogItemId.equals(catalogId) &
+              _db.trackedMedications.archived.equals(false)))
+        .get();
+
+    if (rows.isEmpty) return null;
+    final med = rows.first.readTable(_db.trackedMedications);
+    final catalog = rows.first.readTableOrNull(_db.catalogItems);
+    final scheds = <Schedule>[
+      for (final r in rows)
+        if (r.readTableOrNull(_db.schedules) != null) r.readTable(_db.schedules),
+    ];
+    return TrackedMedicationWithSchedules(
+      medication: med,
+      catalog: catalog,
+      schedules: scheds,
+    );
+  }
+
   /// 같은 (medicationId, timeOfDay) 조합으로 여러 행이 존재하는 legacy 중복
   /// schedules를 정리. 가장 오래된 row만 남기고 나머지 삭제 (intake_logs는
   /// scheduleId setNull로 안전, 일부는 남은 schedule로 재정렬 안 됨 — 과거
@@ -241,11 +324,14 @@ class TrackedMedicationRepository {
 
   /// 같은 (name, category)의 catalog 항목이 있으면 id 반환, 없으면 user
   /// 카탈로그 생성 후 새 id 반환. dedupe + create 통합 헬퍼.
-  /// 반드시 transaction 안에서 호출.
-  Future<String> _resolveOrCreateCatalog(TrackedMedicationDraft draft) async {
+  ///
+  /// Phase 2C: public API. UI step2(name/category 입력 받음)에서 호출 후
+  /// 반환된 id를 [TrackedMedicationDraft.catalogItemId]에 넣어 사용.
+  /// 트랜잭션 외부 호출도 가능 — Drift가 implicit 트랜잭션 처리.
+  Future<String> resolveOrCreateCatalog(CatalogResolveInput input) async {
     final existing = await (_db.select(_db.catalogItems)
           ..where((c) =>
-              c.name.equals(draft.name) & c.category.equals(draft.category))
+              c.name.equals(input.name) & c.category.equals(input.category))
           ..orderBy([
             (c) => OrderingTerm(expression: c.source),
             (c) => OrderingTerm(expression: c.createdAt),
@@ -258,10 +344,13 @@ class TrackedMedicationRepository {
     await _db.into(_db.catalogItems).insert(
           CatalogItemsCompanion.insert(
             id: id,
-            name: draft.name,
-            category: draft.category,
-            defaultDosage: Value(draft.dosage),
-            defaultUnit: Value(draft.unit),
+            name: input.name,
+            category: input.category,
+            defaultDosage: Value(input.defaultDosage),
+            defaultUnit: Value(input.defaultUnit),
+            shape: Value(input.shape),
+            colorHex: Value(input.colorHex),
+            iconKey: Value(input.iconKey),
             tagsJson: Value(jsonEncode(const <String>[])),
             source: const Value(CatalogSource.user),
           ),
@@ -271,30 +360,38 @@ class TrackedMedicationRepository {
 
   Future<int> insertWithSchedules(TrackedMedicationDraft draft) async {
     final medId = await _db.transaction(() async {
-      final catalogId = await _resolveOrCreateCatalog(draft);
+      // catalog ↔ tracked 1:1 — 같은 catalog가 이미 있으면 caller가
+      // updateWithSchedules로 분기하도록 명시적 throw.
+      final existing = await (_db.select(_db.trackedMedications)
+            ..where((m) =>
+                m.catalogItemId.equals(draft.catalogItemId) &
+                m.archived.equals(false)))
+          .getSingleOrNull();
+      if (existing != null) {
+        throw DuplicateCatalogTrackedException(existing.id);
+      }
 
-      // 2) tracked_medications insert with FK.
+      // 1) tracked_medications insert — 메타는 catalog FK로 위임.
       final id = await _db.into(_db.trackedMedications).insert(
             TrackedMedicationsCompanion.insert(
-              catalogItemId: Value(catalogId),
-              name: draft.name,
-              category: Value(draft.category),
-              dosage: Value(draft.dosage),
-              unit: Value(draft.unit),
+              catalogItemId: Value(draft.catalogItemId),
+              customDosage: Value(draft.customDosage),
+              customUnit: Value(draft.customUnit),
               memo: Value(draft.memo),
             ),
           );
 
-      // 3) schedules.
+      // 2) schedules.
+      // startDate는 등록 시각 그대로 보존 — 시각 정보를 자르면 오늘 등록 시점
+      // 이전의 슬롯들이 active로 잡혀 놓침으로 카운트되는 버그.
       final now = DateTime.now();
-      final startOfToday = DateTime(now.year, now.month, now.day);
       // 시각 dedup — UI에서 막지만 방어. legacy draft에 중복 들어오는 경우도 케이스.
       for (final t in draft.times.toSet()) {
         await _db.into(_db.schedules).insert(
               SchedulesCompanion.insert(
                 medicationId: id,
                 timeOfDay: t,
-                startDate: startOfToday,
+                startDate: now,
                 repeatKind: Value(draft.repeatKind),
                 daysOfWeekMask: Value(draft.daysOfWeekMask),
                 intervalDays: Value(draft.intervalDays),
@@ -310,23 +407,18 @@ class TrackedMedicationRepository {
 
   /// 기존 약 수정. 스케줄은 통째로 교체 + 알림 재동기화.
   ///
-  /// catalog는 mutate하지 않음 (다른 tracked가 같은 catalog를 공유할 수 있어
-  /// 부작용 위험). 대신 (name, category)에 맞는 catalog를 dedupe하거나 새로
-  /// 만들어 tracked의 FK만 갈아끼움. relink로 고아가 된 user catalog는
-  /// [_cleanupOrphanUserCatalogs]가 같은 트랜잭션 안에서 정리.
+  /// Phase 2C: catalog FK 자체는 호출자가 [resolveOrCreateCatalog]로 사전 확정.
+  /// 기존 catalog와 다른 id로 변경되면 relink 효과. 같으면 in-place 갱신.
+  /// catalog 자체 mutate는 하지 않음(다른 tracked가 공유 가능).
   Future<void> updateWithSchedules(int id, TrackedMedicationDraft draft) async {
     await _db.transaction(() async {
-      final catalogId = await _resolveOrCreateCatalog(draft);
-
       // tracked 업데이트 (catalogItemId 포함 relink).
       await (_db.update(_db.trackedMedications)..where((m) => m.id.equals(id)))
           .write(
         TrackedMedicationsCompanion(
-          catalogItemId: Value(catalogId),
-          name: Value(draft.name),
-          category: Value(draft.category),
-          dosage: Value(draft.dosage),
-          unit: Value(draft.unit),
+          catalogItemId: Value(draft.catalogItemId),
+          customDosage: Value(draft.customDosage),
+          customUnit: Value(draft.customUnit),
           memo: Value(draft.memo),
           updatedAt: Value(DateTime.now()),
         ),
@@ -335,15 +427,15 @@ class TrackedMedicationRepository {
       // schedules 교체.
       await (_db.delete(_db.schedules)..where((s) => s.medicationId.equals(id)))
           .go();
+      // insertWithSchedules와 동일 — startDate는 시각까지 보존.
       final now = DateTime.now();
-      final startOfToday = DateTime(now.year, now.month, now.day);
       // 시각 dedup — UI에서 막지만 방어. legacy draft에 중복 들어오는 경우도 케이스.
       for (final t in draft.times.toSet()) {
         await _db.into(_db.schedules).insert(
               SchedulesCompanion.insert(
                 medicationId: id,
                 timeOfDay: t,
-                startDate: startOfToday,
+                startDate: now,
                 repeatKind: Value(draft.repeatKind),
                 daysOfWeekMask: Value(draft.daysOfWeekMask),
                 intervalDays: Value(draft.intervalDays),
@@ -377,6 +469,17 @@ class TrackedMedicationRepository {
           .getSingleOrNull();
       if (tracked == null) return;
 
+      // Phase 2C: tracked.name 컬럼 제거 → catalog.name 조회로 snapshot 확보.
+      // catalog가 끊긴 legacy면 빈 문자열 폴백.
+      String? snapshotName;
+      final catalogId = tracked.catalogItemId;
+      if (catalogId != null) {
+        final c = await (_db.select(_db.catalogItems)
+              ..where((c) => c.id.equals(catalogId)))
+            .getSingleOrNull();
+        snapshotName = c?.name;
+      }
+
       // 1) 이름 snapshot — 기존 intake_logs 전부에 적용 (이미 set된 건 덮어쓰지
       //    않도록 IS NULL 조건). 사용자가 같은 이름으로 여러 번 등록·삭제 반복
       //    시에도 가장 처음 삭제 시점 이름이 유지.
@@ -384,7 +487,7 @@ class TrackedMedicationRepository {
             ..where((l) =>
                 l.medicationId.equals(id) & l.medNameSnapshot.isNull()))
           .write(IntakeLogsCompanion(
-        medNameSnapshot: Value(tracked.name),
+        medNameSnapshot: Value(snapshotName),
       ));
 
       // 2) tracked 삭제 — schedules cascade, intake_logs는 medication_id/

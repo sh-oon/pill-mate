@@ -98,6 +98,9 @@ final dosesByRangeProvider = FutureProvider.family
     data: (medsWithSchedules) async {
       final logs = await repo.getRange(range.start, range.end);
       final meds = medsWithSchedules.map((m) => m.medication).toList();
+      final catalogByMedId = {
+        for (final m in medsWithSchedules) m.medication.id: m.catalog,
+      };
       final scheds = [for (final m in medsWithSchedules) ...m.schedules];
 
       final out = <DateTime, List<DoseInstance>>{};
@@ -107,6 +110,7 @@ final dosesByRangeProvider = FutureProvider.family
         out[d] = computeDosesForDay(
           date: d,
           meds: meds,
+          catalogByMedId: catalogByMedId,
           schedules: scheds,
           logs: logs,
         );
@@ -352,6 +356,9 @@ final streakProvider = FutureProvider<int>((ref) async {
     data: (medsWithSchedules) async {
       if (medsWithSchedules.isEmpty) return 0;
       final meds = medsWithSchedules.map((m) => m.medication).toList();
+      final catalogByMedId = {
+        for (final m in medsWithSchedules) m.medication.id: m.catalog,
+      };
       final scheds = [for (final m in medsWithSchedules) ...m.schedules];
 
       final today = _dateOnly(DateTime.now());
@@ -363,6 +370,7 @@ final streakProvider = FutureProvider<int>((ref) async {
         final doses = computeDosesForDay(
           date: day,
           meds: meds,
+          catalogByMedId: catalogByMedId,
           schedules: scheds,
           logs: logs,
         );

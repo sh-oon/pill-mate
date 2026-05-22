@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/debouncer.dart';
 import '../../../core/widgets/app_buttons.dart';
 import '../../../core/widgets/category_chip.dart';
 import '../../../core/widgets/filter_pill.dart';
@@ -29,14 +30,27 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
 
+  /// 검색어 입력 debounce — 매 키스트로크마다 setState하면 큰 리스트에서 끊김.
+  /// 입력 멈춘 뒤 220ms 경과해야 _query 갱신.
+  final _searchDebouncer =
+      Debouncer(delay: const Duration(milliseconds: 220));
+
   @override
   void dispose() {
+    _searchDebouncer.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
+  void _onSearchChanged(String v) {
+    _searchDebouncer.run(() {
+      if (!mounted) return;
+      setState(() => _query = v.trim());
+    });
+  }
+
   bool _matchesCategory(TrackedMedicationWithSchedules m) {
-    final cat = m.medication.category;
+    final cat = m.displayCategory;
     return switch (_filter) {
       _CategoryFilter.all => true,
       _CategoryFilter.sup => cat == 'sup',
@@ -48,7 +62,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
   bool _matchesQuery(TrackedMedicationWithSchedules m) {
     if (_query.isEmpty) return true;
     final q = _query.toLowerCase();
-    final name = m.medication.name.toLowerCase();
+    final name = m.displayName.toLowerCase();
     final memo = m.medication.memo?.toLowerCase() ?? '';
     return name.contains(q) || memo.contains(q);
   }
@@ -117,6 +131,8 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
             const Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
         error: (e, _) => _ErrorState(error: e),
         data: (all) {
+          // Phase 2D(v8): catalog ↔ tracked 1:1 보장 → 그룹핑 불필요. 각 tracked가
+          // 카드 1개.
           final filtered = all.where(_matches).toList()
             ..sort(_sort.comparator);
           return ListView(
@@ -127,7 +143,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
                 child: SearchInputBar(
                   hintText: '약 이름 또는 메모 검색',
                   controller: _searchController,
-                  onChanged: (v) => setState(() => _query = v.trim()),
+                  onChanged: _onSearchChanged,
                 ),
               ),
               _FilterRow(
@@ -151,7 +167,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('${m.medication.name}알람을 제거했어요.'),
+                          content: Text('${m.displayName}알람을 제거했어요.'),
                         ),
                       );
                     },
@@ -270,22 +286,31 @@ extension on _MedicationSort {
         _MedicationSort.nextDose => '다음 복용순',
       };
 
-  int Function(TrackedMedicationWithSchedules, TrackedMedicationWithSchedules) get comparator =>
-      switch (this) {
+  int Function(
+    TrackedMedicationWithSchedules,
+    TrackedMedicationWithSchedules,
+  ) get comparator => switch (this) {
         _MedicationSort.name => _byName,
         _MedicationSort.recent => _byRecent,
         _MedicationSort.nextDose => _byNextDose,
       };
 }
 
-int _byName(TrackedMedicationWithSchedules a, TrackedMedicationWithSchedules b) =>
-    a.medication.name.toLowerCase().compareTo(b.medication.name.toLowerCase());
+int _byName(
+  TrackedMedicationWithSchedules a,
+  TrackedMedicationWithSchedules b,
+) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
 
-int _byRecent(TrackedMedicationWithSchedules a, TrackedMedicationWithSchedules b) =>
-    b.medication.createdAt.compareTo(a.medication.createdAt);
+int _byRecent(
+  TrackedMedicationWithSchedules a,
+  TrackedMedicationWithSchedules b,
+) => b.medication.createdAt.compareTo(a.medication.createdAt);
 
 /// PRN(스케줄 없음)은 항상 마지막. 그 외엔 가장 가까운 미래 복용시각 오름차순.
-int _byNextDose(TrackedMedicationWithSchedules a, TrackedMedicationWithSchedules b) {
+int _byNextDose(
+  TrackedMedicationWithSchedules a,
+  TrackedMedicationWithSchedules b,
+) {
   final na = _nextDoseAt(a);
   final nb = _nextDoseAt(b);
   if (na == null && nb == null) return _byName(a, b);
@@ -317,6 +342,7 @@ DateTime? _nextDoseAt(TrackedMedicationWithSchedules m) {
   ));
 }
 
+
 // ============================================================
 // 약 카드 (`.dc`)
 // ============================================================
@@ -338,9 +364,8 @@ class _MedListCard extends StatelessWidget {
   bool get _isPrn => data.schedules.isEmpty;
 
   String get _quantityLabel {
-    final m = data.medication;
-    final dose = m.dosage;
-    final unit = m.unit;
+    final dose = data.displayDosage;
+    final unit = data.displayUnit;
     if (dose != null && unit != null) return '$dose$unit';
     if (dose != null) return dose;
     return '1정';
@@ -366,7 +391,6 @@ class _MedListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final m = data.medication;
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(20),
@@ -382,8 +406,8 @@ class _MedListCard extends StatelessWidget {
           child: Column(
             children: [
               _MedListCardTop(
-                name: m.name,
-                category: m.category ?? 'sup',
+                name: data.displayName,
+                category: data.displayCategory ?? 'sup',
                 quantity: _isPrn ? '$_quantityLabel (필요시 복용)' : _quantityLabel,
                 alarmOn: _alarmOn,
                 onToggleAlarm: onToggleAlarm,

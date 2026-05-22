@@ -21,6 +21,7 @@ class MedicationDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Phase 2D(v8): catalog ↔ tracked 1:1이 보장돼 단일 인스턴스 watch로 충분.
     final async = ref.watch(trackedMedicationByIdProvider(medicationId));
 
     return Scaffold(
@@ -68,14 +69,15 @@ class _DetailBody extends ConsumerWidget {
     final isPrn = data.schedules.isEmpty;
     final alarmOn = data.schedules.any((s) => s.enabled);
     final times = data.times;
-    final firstSchedule = data.schedules.isEmpty ? null : data.schedules.first;
+    final firstSchedule =
+        data.schedules.isEmpty ? null : data.schedules.first;
     final remindBefore = firstSchedule?.remindBeforeMinutes ?? 0;
     final endDate = firstSchedule?.endDate;
     final memo = m.memo?.trim();
     final hasMemo = memo != null && memo.isNotEmpty;
 
     String quantity() {
-      final d = m.dosage, u = m.unit;
+      final d = data.displayDosage, u = data.displayUnit;
       if (d != null && u != null) return '$d$u';
       if (d != null) return d;
       return '1정';
@@ -118,8 +120,8 @@ class _DetailBody extends ConsumerWidget {
       children: [
         _Header(onBack: () => context.pop()),
         _HeroCard(
-          name: m.name,
-          category: m.category ?? 'sup',
+          name: data.displayName,
+          category: data.displayCategory ?? 'sup',
           quantityLabel: isPrn ? '${quantity()} · 필요시 복용' : quantity(),
         ),
         _Section(
@@ -201,7 +203,7 @@ class _DetailBody extends ConsumerWidget {
                   onPressed: () async {
                     final ok = await ConfirmActionDialog.show(
                       context,
-                      title: '${m.name} 삭제',
+                      title: '${data.displayName} 삭제',
                       message: '이 약과 모든 복용 기록이\n함께 삭제됩니다. 되돌릴 수 없어요.',
                     );
                     if (!context.mounted) return;
@@ -211,7 +213,8 @@ class _DetailBody extends ConsumerWidget {
                           .delete(m.id);
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('${m.name} 삭제됨')),
+                        SnackBar(
+                            content: Text('${data.displayName} 삭제됨')),
                       );
                       context.pop();
                     }
