@@ -297,10 +297,15 @@ class AppFab extends StatelessWidget {
     super.key,
     required this.onPressed,
     this.icon = Icons.add,
+    this.heroTag,
   });
 
   final VoidCallback onPressed;
   final IconData icon;
+
+  /// Hero 태그. 같은 Navigator subtree에 여러 FAB이 있을 때 충돌 방지용.
+  /// null이면 Hero 애니메이션 비활성화.
+  final Object? heroTag;
 
   @override
   Widget build(BuildContext context) {
@@ -310,6 +315,7 @@ class AppFab extends StatelessWidget {
       foregroundColor: Colors.white,
       elevation: 4,
       shape: const CircleBorder(),
+      heroTag: heroTag,
       child: Icon(icon, size: 30),
     );
   }

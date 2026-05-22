@@ -135,6 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
       ),
       floatingActionButton: AppFab(
+        heroTag: 'home_fab',
         onPressed: () => context.push(AppRoute.drawerNew),
       ),
     );

@@ -188,6 +188,7 @@ class _MedicationListScreenState extends ConsumerState<MedicationListScreen> {
         },
       ),
       floatingActionButton: AppFab(
+        heroTag: 'medication_list_fab',
         onPressed: () => context.push(AppRoute.drawerNew),
       ),
     );
