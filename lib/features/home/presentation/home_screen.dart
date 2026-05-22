@@ -198,22 +198,75 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
+  /// calendar-dose-edit: Calendar와 동일한 sheet props로 정합화.
+  /// taken↔missed 양방향 toggle 지원. DB mark 후 invalidate는 StreamProvider
+  /// 자동 전파 — 명시 호출 불필요.
   Future<void> _openEditSheet(
       BuildContext context, DoseInstance dose) async {
+    final now = DateTime.now();
+    if (dose.scheduledAt.isAfter(now)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('아직 예정된 복용입니다')),
+      );
+      return;
+    }
+
     final choice = await EditRecordSheet.show(
       context,
       medName: dose.medicationName,
       category: dose.category ?? 'sup',
       time: dose.timeOfDay,
-      yesterday: false,
+      dateLabel: _relativeLabel(dose.scheduledAt),
+      currentStatus: dose.status,
+      allowMissed: true,
     );
-    if (choice == EditRecordChoice.markTaken) {
-      await ref.read(intakeRepositoryProvider).markTaken(
+    if (!context.mounted) return;
+
+    final repo = ref.read(intakeRepositoryProvider);
+    final String feedback;
+    try {
+      switch (choice) {
+        case EditRecordChoice.markTaken:
+          await repo.markTaken(
             medicationId: dose.medicationId,
             scheduleId: dose.scheduleId,
             scheduledAt: dose.scheduledAt,
           );
+          feedback = "'이미 복용'으로 수정했어요";
+        case EditRecordChoice.markMissed:
+          await repo.markMissed(
+            medicationId: dose.medicationId,
+            scheduleId: dose.scheduleId,
+            scheduledAt: dose.scheduledAt,
+          );
+          feedback = "'놓침'으로 수정했어요";
+        case EditRecordChoice.keep:
+        case null:
+          return;
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('변경 실패: $e')),
+      );
+      return;
     }
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(feedback)));
+  }
+
+  String _relativeLabel(DateTime scheduledAt) {
+    final today = DateTime.now();
+    final t = DateTime(today.year, today.month, today.day);
+    final d =
+        DateTime(scheduledAt.year, scheduledAt.month, scheduledAt.day);
+    final delta = d.difference(t).inDays;
+    if (delta == 0) return '오늘';
+    if (delta == -1) return '어제';
+    if (delta < -1) return '${-delta}일 전';
+    return '${scheduledAt.month}월 ${scheduledAt.day}일';
   }
 }
 
