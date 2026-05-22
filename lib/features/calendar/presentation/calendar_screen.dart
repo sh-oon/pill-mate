@@ -10,9 +10,11 @@ import '../../../core/widgets/category_chip.dart';
 import '../../../core/widgets/filter_pill.dart';
 import '../../../core/widgets/pill_icon.dart';
 import '../../../core/widgets/sheets/bundle_notification_sheet.dart';
+import '../../../core/widgets/sheets/edit_record_sheet.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/timeline_row.dart';
 import '../../medication/data/calendar_providers.dart';
+import '../../medication/data/intake_providers.dart';
 import '../../medication/data/intake_repository.dart';
 import 'widgets/calendar_legend.dart';
 import 'widgets/month_grid.dart';
@@ -94,6 +96,77 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     const dow = ['월', '화', '수', '목', '금', '토', '일'];
     final w = dow[date.weekday - 1];
     return '${date.month}월 ${date.day}일 ($w) 복용 기록';
+  }
+
+  /// calendar-dose-edit: dose card tap → 사후 편집 sheet.
+  ///
+  /// 미래 dose는 sheet 미노출 + SnackBar 안내. DB mark 후 invalidate는
+  /// StreamProvider(dayDoses/monthMarks/todayLogs)가 자동 전파 — 명시 호출 불필요.
+  Future<void> _openEditSheet(DoseInstance dose) async {
+    final now = DateTime.now();
+    if (dose.scheduledAt.isAfter(now)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('아직 예정된 복용입니다')),
+      );
+      return;
+    }
+
+    final choice = await EditRecordSheet.show(
+      context,
+      medName: dose.medicationName,
+      category: dose.category ?? 'sup',
+      time: dose.timeOfDay,
+      dateLabel: _relativeLabel(dose.scheduledAt),
+      currentStatus: dose.status,
+      allowMissed: true,
+    );
+    if (!mounted) return;
+
+    final repo = ref.read(intakeRepositoryProvider);
+    final String feedback;
+    try {
+      switch (choice) {
+        case EditRecordChoice.markTaken:
+          await repo.markTaken(
+            medicationId: dose.medicationId,
+            scheduleId: dose.scheduleId,
+            scheduledAt: dose.scheduledAt,
+          );
+          feedback = "'이미 복용'으로 수정했어요";
+        case EditRecordChoice.markMissed:
+          await repo.markMissed(
+            medicationId: dose.medicationId,
+            scheduleId: dose.scheduleId,
+            scheduledAt: dose.scheduledAt,
+          );
+          feedback = "'놓침'으로 수정했어요";
+        case EditRecordChoice.keep:
+        case null:
+          return;
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('변경 실패: $e')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(feedback)));
+  }
+
+  String _relativeLabel(DateTime scheduledAt) {
+    final today = DateTime.now();
+    final t = DateTime(today.year, today.month, today.day);
+    final d =
+        DateTime(scheduledAt.year, scheduledAt.month, scheduledAt.day);
+    final delta = d.difference(t).inDays;
+    if (delta == 0) return '오늘';
+    if (delta == -1) return '어제';
+    if (delta < -1) return '${-delta}일 전';
+    return '${scheduledAt.month}월 ${scheduledAt.day}일';
   }
 
   @override
@@ -195,7 +268,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   time: r.timeOfDay,
                   dotColor: _statusColor(r.status),
                   timeColor: _statusColor(r.status),
-                  child: _RecordCard(record: r),
+                  child: _RecordCard(
+                    record: r,
+                    onTap: () => _openEditSheet(r),
+                  ),
                 ),
           ],
         ),
@@ -291,56 +367,64 @@ class _DayFilterRow extends StatelessWidget {
 // ============================================================
 
 class _RecordCard extends StatelessWidget {
-  const _RecordCard({required this.record});
+  const _RecordCard({required this.record, required this.onTap});
   final DoseInstance record;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          PillIcon.svg(medName: record.medicationName),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              PillIcon.svg(medName: record.medicationName),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Text(
-                        record.medicationName,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textStrong,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            record.medicationName,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textStrong,
+                            ),
+                          ),
                         ),
+                        const SizedBox(width: 6),
+                        CategoryChip.fromCode(record.category ?? 'sup'),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      record.quantityLabel,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    CategoryChip.fromCode(record.category ?? 'sup'),
                   ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  record.quantityLabel,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              StatusBadge(status: _toBadgeStatus(record.status)),
+            ],
           ),
-          const SizedBox(width: 8),
-          StatusBadge(status: _toBadgeStatus(record.status)),
-        ],
+        ),
       ),
     );
   }

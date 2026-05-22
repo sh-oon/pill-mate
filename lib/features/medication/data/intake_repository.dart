@@ -252,13 +252,21 @@ List<DoseInstance> computeDosesForDay({
     // 등록 시각 이전 슬롯(예: 14시 등록 + 08:00 시각)은 사용자가 실시간으로
     // 챙길 수 없었던 슬롯이라 자동 "놓침" 처리 X — pending으로 유지해 홈/캘린더
     // 리스트엔 보이되 리포트 놓침 카운트는 부풀리지 않음.
+    //
+    // calendar-dose-edit (v2): 과거 날짜의 미기록 활성 슬롯은 정확성 회복을
+    // 위해 missed로 계산(read-only, log 미생성). 사용자가 calendar에서 toggle
+    // 하면 비로소 log row가 생기고 그 status가 우선(`if (hasLog)` 분기).
     final beforeStart = scheduledAt.isBefore(s.startDate);
+    final isPastDay = _dateOnly(date).isBefore(_dateOnly(nowTime));
     final IntakeStatus status;
     if (hasLog) {
       status = log.status;
+    } else if (beforeStart) {
+      status = IntakeStatus.pending;
     } else if (isToday &&
-        !beforeStart &&
         nowTime.isAfter(scheduledAt.add(const Duration(minutes: 5)))) {
+      status = IntakeStatus.missed;
+    } else if (isPastDay) {
       status = IntakeStatus.missed;
     } else {
       status = IntakeStatus.pending;
