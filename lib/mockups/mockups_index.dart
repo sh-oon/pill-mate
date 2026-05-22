@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import 'mockup_drawer_card.dart';
+import 'mockup_drawer_screen.dart';
 import 'mockup_step1_catalog.dart';
 import 'mockup_step2_instance.dart';
 import 'mockup_step3_alarm.dart';
@@ -41,6 +42,11 @@ class MockupsIndex extends StatelessWidget {
       description: '알람 0개일 때 prominent "알람 추가" 섹션. 토글로 알람 있음/없음 미리보기.',
       builder: _build5,
     ),
+    _MockupEntry(
+      title: '약 서랍 — 전체 화면 (등록됨/비어있음/검색0건)',
+      description: '헤더 + 검색 + 필터 chip(전체/알람있음/알람없음) + 정렬. 3가지 상태 토글로 미리보기.',
+      builder: _build6,
+    ),
   ];
 
   static Widget _build1(BuildContext c) => const MockupStep1Catalog();
@@ -48,6 +54,7 @@ class MockupsIndex extends StatelessWidget {
   static Widget _build3(BuildContext c) => const MockupStep3Alarm();
   static Widget _build4(BuildContext c) => const MockupDrawerCard();
   static Widget _build5(BuildContext c) => const MockupTrackedDetail();
+  static Widget _build6(BuildContext c) => const MockupDrawerScreen();
 
   @override
   Widget build(BuildContext context) {

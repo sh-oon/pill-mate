@@ -792,73 +792,27 @@ class $TrackedMedicationsTable extends TrackedMedications
       'REFERENCES catalog_items (id) ON DELETE SET NULL',
     ),
   );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    additionalChecks: GeneratedColumn.checkTextLength(
-      minTextLength: 1,
-      maxTextLength: 80,
-    ),
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _categoryMeta = const VerificationMeta(
-    'category',
+  static const VerificationMeta _customDosageMeta = const VerificationMeta(
+    'customDosage',
   );
   @override
-  late final GeneratedColumn<String> category = GeneratedColumn<String>(
-    'category',
-    aliasedName,
-    true,
-    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 8),
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _dosageMeta = const VerificationMeta('dosage');
-  @override
-  late final GeneratedColumn<String> dosage = GeneratedColumn<String>(
-    'dosage',
+  late final GeneratedColumn<String> customDosage = GeneratedColumn<String>(
+    'custom_dosage',
     aliasedName,
     true,
     additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 40),
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  static const VerificationMeta _customUnitMeta = const VerificationMeta(
+    'customUnit',
+  );
   @override
-  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
-    'unit',
+  late final GeneratedColumn<String> customUnit = GeneratedColumn<String>(
+    'custom_unit',
     aliasedName,
     true,
     additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 20),
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _shapeMeta = const VerificationMeta('shape');
-  @override
-  late final GeneratedColumn<String> shape = GeneratedColumn<String>(
-    'shape',
-    aliasedName,
-    true,
-    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 20),
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _colorHexMeta = const VerificationMeta(
-    'colorHex',
-  );
-  @override
-  late final GeneratedColumn<String> colorHex = GeneratedColumn<String>(
-    'color_hex',
-    aliasedName,
-    true,
-    additionalChecks: GeneratedColumn.checkTextLength(
-      minTextLength: 7,
-      maxTextLength: 9,
-    ),
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
@@ -868,18 +822,6 @@ class $TrackedMedicationsTable extends TrackedMedications
     'memo',
     aliasedName,
     true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _iconKeyMeta = const VerificationMeta(
-    'iconKey',
-  );
-  @override
-  late final GeneratedColumn<String> iconKey = GeneratedColumn<String>(
-    'icon_key',
-    aliasedName,
-    true,
-    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 40),
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
@@ -926,14 +868,9 @@ class $TrackedMedicationsTable extends TrackedMedications
   List<GeneratedColumn> get $columns => [
     id,
     catalogItemId,
-    name,
-    category,
-    dosage,
-    unit,
-    shape,
-    colorHex,
+    customDosage,
+    customUnit,
     memo,
-    iconKey,
     archived,
     createdAt,
     updatedAt,
@@ -962,54 +899,25 @@ class $TrackedMedicationsTable extends TrackedMedications
         ),
       );
     }
-    if (data.containsKey('name')) {
+    if (data.containsKey('custom_dosage')) {
       context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('category')) {
-      context.handle(
-        _categoryMeta,
-        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+        _customDosageMeta,
+        customDosage.isAcceptableOrUnknown(
+          data['custom_dosage']!,
+          _customDosageMeta,
+        ),
       );
     }
-    if (data.containsKey('dosage')) {
+    if (data.containsKey('custom_unit')) {
       context.handle(
-        _dosageMeta,
-        dosage.isAcceptableOrUnknown(data['dosage']!, _dosageMeta),
-      );
-    }
-    if (data.containsKey('unit')) {
-      context.handle(
-        _unitMeta,
-        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
-      );
-    }
-    if (data.containsKey('shape')) {
-      context.handle(
-        _shapeMeta,
-        shape.isAcceptableOrUnknown(data['shape']!, _shapeMeta),
-      );
-    }
-    if (data.containsKey('color_hex')) {
-      context.handle(
-        _colorHexMeta,
-        colorHex.isAcceptableOrUnknown(data['color_hex']!, _colorHexMeta),
+        _customUnitMeta,
+        customUnit.isAcceptableOrUnknown(data['custom_unit']!, _customUnitMeta),
       );
     }
     if (data.containsKey('memo')) {
       context.handle(
         _memoMeta,
         memo.isAcceptableOrUnknown(data['memo']!, _memoMeta),
-      );
-    }
-    if (data.containsKey('icon_key')) {
-      context.handle(
-        _iconKeyMeta,
-        iconKey.isAcceptableOrUnknown(data['icon_key']!, _iconKeyMeta),
       );
     }
     if (data.containsKey('archived')) {
@@ -1047,37 +955,17 @@ class $TrackedMedicationsTable extends TrackedMedications
         DriftSqlType.string,
         data['${effectivePrefix}catalog_item_id'],
       ),
-      name: attachedDatabase.typeMapping.read(
+      customDosage: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      category: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}category'],
+        data['${effectivePrefix}custom_dosage'],
       ),
-      dosage: attachedDatabase.typeMapping.read(
+      customUnit: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}dosage'],
-      ),
-      unit: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}unit'],
-      ),
-      shape: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}shape'],
-      ),
-      colorHex: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}color_hex'],
+        data['${effectivePrefix}custom_unit'],
       ),
       memo: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}memo'],
-      ),
-      iconKey: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}icon_key'],
       ),
       archived: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
@@ -1104,33 +992,27 @@ class TrackedMedication extends DataClass
     implements Insertable<TrackedMedication> {
   final int id;
 
-  /// 카탈로그 항목 FK. nullable: 마이그레이션 이전 데이터/직접 입력 경로.
-  /// 카탈로그 항목 삭제 시 setNull (사용자 tracked는 남되 카탈로그 연결만 끊김).
+  /// 카탈로그 항목 FK. nullable: catalog 삭제 시 setNull로 끊긴 legacy 보호.
+  /// 신규 등록은 항상 catalog 보장(_resolveOrCreateCatalog).
   final String? catalogItemId;
-  final String name;
 
-  /// 'med' (약) | 'sup' (영양제). 카테고리.
-  final String? category;
-  final String? dosage;
-  final String? unit;
-  final String? shape;
-  final String? colorHex;
+  /// catalog.defaultDosage override 전용. null이면 catalog 값 사용.
+  final String? customDosage;
+
+  /// catalog.defaultUnit override 전용. null이면 catalog 값 사용.
+  final String? customUnit;
+
+  /// 사용자 인스턴스 상태.
   final String? memo;
-  final String? iconKey;
   final bool archived;
   final DateTime createdAt;
   final DateTime updatedAt;
   const TrackedMedication({
     required this.id,
     this.catalogItemId,
-    required this.name,
-    this.category,
-    this.dosage,
-    this.unit,
-    this.shape,
-    this.colorHex,
+    this.customDosage,
+    this.customUnit,
     this.memo,
-    this.iconKey,
     required this.archived,
     required this.createdAt,
     required this.updatedAt,
@@ -1142,27 +1024,14 @@ class TrackedMedication extends DataClass
     if (!nullToAbsent || catalogItemId != null) {
       map['catalog_item_id'] = Variable<String>(catalogItemId);
     }
-    map['name'] = Variable<String>(name);
-    if (!nullToAbsent || category != null) {
-      map['category'] = Variable<String>(category);
+    if (!nullToAbsent || customDosage != null) {
+      map['custom_dosage'] = Variable<String>(customDosage);
     }
-    if (!nullToAbsent || dosage != null) {
-      map['dosage'] = Variable<String>(dosage);
-    }
-    if (!nullToAbsent || unit != null) {
-      map['unit'] = Variable<String>(unit);
-    }
-    if (!nullToAbsent || shape != null) {
-      map['shape'] = Variable<String>(shape);
-    }
-    if (!nullToAbsent || colorHex != null) {
-      map['color_hex'] = Variable<String>(colorHex);
+    if (!nullToAbsent || customUnit != null) {
+      map['custom_unit'] = Variable<String>(customUnit);
     }
     if (!nullToAbsent || memo != null) {
       map['memo'] = Variable<String>(memo);
-    }
-    if (!nullToAbsent || iconKey != null) {
-      map['icon_key'] = Variable<String>(iconKey);
     }
     map['archived'] = Variable<bool>(archived);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -1176,24 +1045,13 @@ class TrackedMedication extends DataClass
       catalogItemId: catalogItemId == null && nullToAbsent
           ? const Value.absent()
           : Value(catalogItemId),
-      name: Value(name),
-      category: category == null && nullToAbsent
+      customDosage: customDosage == null && nullToAbsent
           ? const Value.absent()
-          : Value(category),
-      dosage: dosage == null && nullToAbsent
+          : Value(customDosage),
+      customUnit: customUnit == null && nullToAbsent
           ? const Value.absent()
-          : Value(dosage),
-      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
-      shape: shape == null && nullToAbsent
-          ? const Value.absent()
-          : Value(shape),
-      colorHex: colorHex == null && nullToAbsent
-          ? const Value.absent()
-          : Value(colorHex),
+          : Value(customUnit),
       memo: memo == null && nullToAbsent ? const Value.absent() : Value(memo),
-      iconKey: iconKey == null && nullToAbsent
-          ? const Value.absent()
-          : Value(iconKey),
       archived: Value(archived),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -1208,14 +1066,9 @@ class TrackedMedication extends DataClass
     return TrackedMedication(
       id: serializer.fromJson<int>(json['id']),
       catalogItemId: serializer.fromJson<String?>(json['catalogItemId']),
-      name: serializer.fromJson<String>(json['name']),
-      category: serializer.fromJson<String?>(json['category']),
-      dosage: serializer.fromJson<String?>(json['dosage']),
-      unit: serializer.fromJson<String?>(json['unit']),
-      shape: serializer.fromJson<String?>(json['shape']),
-      colorHex: serializer.fromJson<String?>(json['colorHex']),
+      customDosage: serializer.fromJson<String?>(json['customDosage']),
+      customUnit: serializer.fromJson<String?>(json['customUnit']),
       memo: serializer.fromJson<String?>(json['memo']),
-      iconKey: serializer.fromJson<String?>(json['iconKey']),
       archived: serializer.fromJson<bool>(json['archived']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -1227,14 +1080,9 @@ class TrackedMedication extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'catalogItemId': serializer.toJson<String?>(catalogItemId),
-      'name': serializer.toJson<String>(name),
-      'category': serializer.toJson<String?>(category),
-      'dosage': serializer.toJson<String?>(dosage),
-      'unit': serializer.toJson<String?>(unit),
-      'shape': serializer.toJson<String?>(shape),
-      'colorHex': serializer.toJson<String?>(colorHex),
+      'customDosage': serializer.toJson<String?>(customDosage),
+      'customUnit': serializer.toJson<String?>(customUnit),
       'memo': serializer.toJson<String?>(memo),
-      'iconKey': serializer.toJson<String?>(iconKey),
       'archived': serializer.toJson<bool>(archived),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -1244,14 +1092,9 @@ class TrackedMedication extends DataClass
   TrackedMedication copyWith({
     int? id,
     Value<String?> catalogItemId = const Value.absent(),
-    String? name,
-    Value<String?> category = const Value.absent(),
-    Value<String?> dosage = const Value.absent(),
-    Value<String?> unit = const Value.absent(),
-    Value<String?> shape = const Value.absent(),
-    Value<String?> colorHex = const Value.absent(),
+    Value<String?> customDosage = const Value.absent(),
+    Value<String?> customUnit = const Value.absent(),
     Value<String?> memo = const Value.absent(),
-    Value<String?> iconKey = const Value.absent(),
     bool? archived,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -1260,14 +1103,9 @@ class TrackedMedication extends DataClass
     catalogItemId: catalogItemId.present
         ? catalogItemId.value
         : this.catalogItemId,
-    name: name ?? this.name,
-    category: category.present ? category.value : this.category,
-    dosage: dosage.present ? dosage.value : this.dosage,
-    unit: unit.present ? unit.value : this.unit,
-    shape: shape.present ? shape.value : this.shape,
-    colorHex: colorHex.present ? colorHex.value : this.colorHex,
+    customDosage: customDosage.present ? customDosage.value : this.customDosage,
+    customUnit: customUnit.present ? customUnit.value : this.customUnit,
     memo: memo.present ? memo.value : this.memo,
-    iconKey: iconKey.present ? iconKey.value : this.iconKey,
     archived: archived ?? this.archived,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -1278,14 +1116,13 @@ class TrackedMedication extends DataClass
       catalogItemId: data.catalogItemId.present
           ? data.catalogItemId.value
           : this.catalogItemId,
-      name: data.name.present ? data.name.value : this.name,
-      category: data.category.present ? data.category.value : this.category,
-      dosage: data.dosage.present ? data.dosage.value : this.dosage,
-      unit: data.unit.present ? data.unit.value : this.unit,
-      shape: data.shape.present ? data.shape.value : this.shape,
-      colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
+      customDosage: data.customDosage.present
+          ? data.customDosage.value
+          : this.customDosage,
+      customUnit: data.customUnit.present
+          ? data.customUnit.value
+          : this.customUnit,
       memo: data.memo.present ? data.memo.value : this.memo,
-      iconKey: data.iconKey.present ? data.iconKey.value : this.iconKey,
       archived: data.archived.present ? data.archived.value : this.archived,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -1297,14 +1134,9 @@ class TrackedMedication extends DataClass
     return (StringBuffer('TrackedMedication(')
           ..write('id: $id, ')
           ..write('catalogItemId: $catalogItemId, ')
-          ..write('name: $name, ')
-          ..write('category: $category, ')
-          ..write('dosage: $dosage, ')
-          ..write('unit: $unit, ')
-          ..write('shape: $shape, ')
-          ..write('colorHex: $colorHex, ')
+          ..write('customDosage: $customDosage, ')
+          ..write('customUnit: $customUnit, ')
           ..write('memo: $memo, ')
-          ..write('iconKey: $iconKey, ')
           ..write('archived: $archived, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -1316,14 +1148,9 @@ class TrackedMedication extends DataClass
   int get hashCode => Object.hash(
     id,
     catalogItemId,
-    name,
-    category,
-    dosage,
-    unit,
-    shape,
-    colorHex,
+    customDosage,
+    customUnit,
     memo,
-    iconKey,
     archived,
     createdAt,
     updatedAt,
@@ -1334,14 +1161,9 @@ class TrackedMedication extends DataClass
       (other is TrackedMedication &&
           other.id == this.id &&
           other.catalogItemId == this.catalogItemId &&
-          other.name == this.name &&
-          other.category == this.category &&
-          other.dosage == this.dosage &&
-          other.unit == this.unit &&
-          other.shape == this.shape &&
-          other.colorHex == this.colorHex &&
+          other.customDosage == this.customDosage &&
+          other.customUnit == this.customUnit &&
           other.memo == this.memo &&
-          other.iconKey == this.iconKey &&
           other.archived == this.archived &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -1350,28 +1172,18 @@ class TrackedMedication extends DataClass
 class TrackedMedicationsCompanion extends UpdateCompanion<TrackedMedication> {
   final Value<int> id;
   final Value<String?> catalogItemId;
-  final Value<String> name;
-  final Value<String?> category;
-  final Value<String?> dosage;
-  final Value<String?> unit;
-  final Value<String?> shape;
-  final Value<String?> colorHex;
+  final Value<String?> customDosage;
+  final Value<String?> customUnit;
   final Value<String?> memo;
-  final Value<String?> iconKey;
   final Value<bool> archived;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const TrackedMedicationsCompanion({
     this.id = const Value.absent(),
     this.catalogItemId = const Value.absent(),
-    this.name = const Value.absent(),
-    this.category = const Value.absent(),
-    this.dosage = const Value.absent(),
-    this.unit = const Value.absent(),
-    this.shape = const Value.absent(),
-    this.colorHex = const Value.absent(),
+    this.customDosage = const Value.absent(),
+    this.customUnit = const Value.absent(),
     this.memo = const Value.absent(),
-    this.iconKey = const Value.absent(),
     this.archived = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1379,29 +1191,19 @@ class TrackedMedicationsCompanion extends UpdateCompanion<TrackedMedication> {
   TrackedMedicationsCompanion.insert({
     this.id = const Value.absent(),
     this.catalogItemId = const Value.absent(),
-    required String name,
-    this.category = const Value.absent(),
-    this.dosage = const Value.absent(),
-    this.unit = const Value.absent(),
-    this.shape = const Value.absent(),
-    this.colorHex = const Value.absent(),
+    this.customDosage = const Value.absent(),
+    this.customUnit = const Value.absent(),
     this.memo = const Value.absent(),
-    this.iconKey = const Value.absent(),
     this.archived = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
-  }) : name = Value(name);
+  });
   static Insertable<TrackedMedication> custom({
     Expression<int>? id,
     Expression<String>? catalogItemId,
-    Expression<String>? name,
-    Expression<String>? category,
-    Expression<String>? dosage,
-    Expression<String>? unit,
-    Expression<String>? shape,
-    Expression<String>? colorHex,
+    Expression<String>? customDosage,
+    Expression<String>? customUnit,
     Expression<String>? memo,
-    Expression<String>? iconKey,
     Expression<bool>? archived,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -1409,14 +1211,9 @@ class TrackedMedicationsCompanion extends UpdateCompanion<TrackedMedication> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (catalogItemId != null) 'catalog_item_id': catalogItemId,
-      if (name != null) 'name': name,
-      if (category != null) 'category': category,
-      if (dosage != null) 'dosage': dosage,
-      if (unit != null) 'unit': unit,
-      if (shape != null) 'shape': shape,
-      if (colorHex != null) 'color_hex': colorHex,
+      if (customDosage != null) 'custom_dosage': customDosage,
+      if (customUnit != null) 'custom_unit': customUnit,
       if (memo != null) 'memo': memo,
-      if (iconKey != null) 'icon_key': iconKey,
       if (archived != null) 'archived': archived,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1426,14 +1223,9 @@ class TrackedMedicationsCompanion extends UpdateCompanion<TrackedMedication> {
   TrackedMedicationsCompanion copyWith({
     Value<int>? id,
     Value<String?>? catalogItemId,
-    Value<String>? name,
-    Value<String?>? category,
-    Value<String?>? dosage,
-    Value<String?>? unit,
-    Value<String?>? shape,
-    Value<String?>? colorHex,
+    Value<String?>? customDosage,
+    Value<String?>? customUnit,
     Value<String?>? memo,
-    Value<String?>? iconKey,
     Value<bool>? archived,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -1441,14 +1233,9 @@ class TrackedMedicationsCompanion extends UpdateCompanion<TrackedMedication> {
     return TrackedMedicationsCompanion(
       id: id ?? this.id,
       catalogItemId: catalogItemId ?? this.catalogItemId,
-      name: name ?? this.name,
-      category: category ?? this.category,
-      dosage: dosage ?? this.dosage,
-      unit: unit ?? this.unit,
-      shape: shape ?? this.shape,
-      colorHex: colorHex ?? this.colorHex,
+      customDosage: customDosage ?? this.customDosage,
+      customUnit: customUnit ?? this.customUnit,
       memo: memo ?? this.memo,
-      iconKey: iconKey ?? this.iconKey,
       archived: archived ?? this.archived,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1464,29 +1251,14 @@ class TrackedMedicationsCompanion extends UpdateCompanion<TrackedMedication> {
     if (catalogItemId.present) {
       map['catalog_item_id'] = Variable<String>(catalogItemId.value);
     }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
+    if (customDosage.present) {
+      map['custom_dosage'] = Variable<String>(customDosage.value);
     }
-    if (category.present) {
-      map['category'] = Variable<String>(category.value);
-    }
-    if (dosage.present) {
-      map['dosage'] = Variable<String>(dosage.value);
-    }
-    if (unit.present) {
-      map['unit'] = Variable<String>(unit.value);
-    }
-    if (shape.present) {
-      map['shape'] = Variable<String>(shape.value);
-    }
-    if (colorHex.present) {
-      map['color_hex'] = Variable<String>(colorHex.value);
+    if (customUnit.present) {
+      map['custom_unit'] = Variable<String>(customUnit.value);
     }
     if (memo.present) {
       map['memo'] = Variable<String>(memo.value);
-    }
-    if (iconKey.present) {
-      map['icon_key'] = Variable<String>(iconKey.value);
     }
     if (archived.present) {
       map['archived'] = Variable<bool>(archived.value);
@@ -1505,14 +1277,9 @@ class TrackedMedicationsCompanion extends UpdateCompanion<TrackedMedication> {
     return (StringBuffer('TrackedMedicationsCompanion(')
           ..write('id: $id, ')
           ..write('catalogItemId: $catalogItemId, ')
-          ..write('name: $name, ')
-          ..write('category: $category, ')
-          ..write('dosage: $dosage, ')
-          ..write('unit: $unit, ')
-          ..write('shape: $shape, ')
-          ..write('colorHex: $colorHex, ')
+          ..write('customDosage: $customDosage, ')
+          ..write('customUnit: $customUnit, ')
           ..write('memo: $memo, ')
-          ..write('iconKey: $iconKey, ')
           ..write('archived: $archived, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -2413,11 +2180,11 @@ class $IntakeLogsTable extends IntakeLogs
   late final GeneratedColumn<int> medicationId = GeneratedColumn<int>(
     'medication_id',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.int,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES tracked_medications (id) ON DELETE CASCADE',
+      'REFERENCES tracked_medications (id) ON DELETE SET NULL',
     ),
   );
   static const VerificationMeta _scheduleIdMeta = const VerificationMeta(
@@ -2427,12 +2194,23 @@ class $IntakeLogsTable extends IntakeLogs
   late final GeneratedColumn<int> scheduleId = GeneratedColumn<int>(
     'schedule_id',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.int,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES schedules (id) ON DELETE CASCADE',
+      'REFERENCES schedules (id) ON DELETE SET NULL',
     ),
+  );
+  static const VerificationMeta _medNameSnapshotMeta = const VerificationMeta(
+    'medNameSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> medNameSnapshot = GeneratedColumn<String>(
+    'med_name_snapshot',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _scheduledAtMeta = const VerificationMeta(
     'scheduledAt',
@@ -2516,6 +2294,7 @@ class $IntakeLogsTable extends IntakeLogs
     id,
     medicationId,
     scheduleId,
+    medNameSnapshot,
     scheduledAt,
     actedAt,
     status,
@@ -2547,16 +2326,21 @@ class $IntakeLogsTable extends IntakeLogs
           _medicationIdMeta,
         ),
       );
-    } else if (isInserting) {
-      context.missing(_medicationIdMeta);
     }
     if (data.containsKey('schedule_id')) {
       context.handle(
         _scheduleIdMeta,
         scheduleId.isAcceptableOrUnknown(data['schedule_id']!, _scheduleIdMeta),
       );
-    } else if (isInserting) {
-      context.missing(_scheduleIdMeta);
+    }
+    if (data.containsKey('med_name_snapshot')) {
+      context.handle(
+        _medNameSnapshotMeta,
+        medNameSnapshot.isAcceptableOrUnknown(
+          data['med_name_snapshot']!,
+          _medNameSnapshotMeta,
+        ),
+      );
     }
     if (data.containsKey('scheduled_at')) {
       context.handle(
@@ -2618,11 +2402,15 @@ class $IntakeLogsTable extends IntakeLogs
       medicationId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}medication_id'],
-      )!,
+      ),
       scheduleId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}schedule_id'],
-      )!,
+      ),
+      medNameSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}med_name_snapshot'],
+      ),
       scheduledAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}scheduled_at'],
@@ -2668,9 +2456,19 @@ class $IntakeLogsTable extends IntakeLogs
 class IntakeLog extends DataClass implements Insertable<IntakeLog> {
   final int id;
 
-  /// FK → tracked_medications.id. 변수명은 호환성 위해 medicationId 유지.
-  final int medicationId;
-  final int scheduleId;
+  /// FK → tracked_medications.id. tracked 삭제 시 setNull — 복용 기록은 DB에
+  /// 보존하되 origin tracked는 사라짐. 표시용 이름은 [medNameSnapshot].
+  /// 변수명은 호환성 위해 medicationId 유지.
+  final int? medicationId;
+
+  /// FK → schedules.id. tracked 삭제 시 cascade로 schedules도 사라지므로
+  /// 이 FK도 동반 setNull.
+  final int? scheduleId;
+
+  /// tracked 삭제 후에도 어떤 약의 기록이었는지 식별할 수 있도록 이름 스냅샷.
+  /// [TrackedMedicationRepository.delete] 호출 시점에 tracked.name을 복사.
+  /// tracked가 살아 있는 동안엔 null.
+  final String? medNameSnapshot;
 
   /// 예정된 시각 (로컬 wallclock 기준 DateTime)
   final DateTime scheduledAt;
@@ -2686,8 +2484,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
   final DateTime updatedAt;
   const IntakeLog({
     required this.id,
-    required this.medicationId,
-    required this.scheduleId,
+    this.medicationId,
+    this.scheduleId,
+    this.medNameSnapshot,
     required this.scheduledAt,
     this.actedAt,
     required this.status,
@@ -2700,8 +2499,15 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
-    map['medication_id'] = Variable<int>(medicationId);
-    map['schedule_id'] = Variable<int>(scheduleId);
+    if (!nullToAbsent || medicationId != null) {
+      map['medication_id'] = Variable<int>(medicationId);
+    }
+    if (!nullToAbsent || scheduleId != null) {
+      map['schedule_id'] = Variable<int>(scheduleId);
+    }
+    if (!nullToAbsent || medNameSnapshot != null) {
+      map['med_name_snapshot'] = Variable<String>(medNameSnapshot);
+    }
     map['scheduled_at'] = Variable<DateTime>(scheduledAt);
     if (!nullToAbsent || actedAt != null) {
       map['acted_at'] = Variable<DateTime>(actedAt);
@@ -2723,8 +2529,15 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
   IntakeLogsCompanion toCompanion(bool nullToAbsent) {
     return IntakeLogsCompanion(
       id: Value(id),
-      medicationId: Value(medicationId),
-      scheduleId: Value(scheduleId),
+      medicationId: medicationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medicationId),
+      scheduleId: scheduleId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(scheduleId),
+      medNameSnapshot: medNameSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medNameSnapshot),
       scheduledAt: Value(scheduledAt),
       actedAt: actedAt == null && nullToAbsent
           ? const Value.absent()
@@ -2744,8 +2557,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return IntakeLog(
       id: serializer.fromJson<int>(json['id']),
-      medicationId: serializer.fromJson<int>(json['medicationId']),
-      scheduleId: serializer.fromJson<int>(json['scheduleId']),
+      medicationId: serializer.fromJson<int?>(json['medicationId']),
+      scheduleId: serializer.fromJson<int?>(json['scheduleId']),
+      medNameSnapshot: serializer.fromJson<String?>(json['medNameSnapshot']),
       scheduledAt: serializer.fromJson<DateTime>(json['scheduledAt']),
       actedAt: serializer.fromJson<DateTime?>(json['actedAt']),
       status: $IntakeLogsTable.$converterstatus.fromJson(
@@ -2762,8 +2576,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
-      'medicationId': serializer.toJson<int>(medicationId),
-      'scheduleId': serializer.toJson<int>(scheduleId),
+      'medicationId': serializer.toJson<int?>(medicationId),
+      'scheduleId': serializer.toJson<int?>(scheduleId),
+      'medNameSnapshot': serializer.toJson<String?>(medNameSnapshot),
       'scheduledAt': serializer.toJson<DateTime>(scheduledAt),
       'actedAt': serializer.toJson<DateTime?>(actedAt),
       'status': serializer.toJson<int>(
@@ -2778,8 +2593,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
 
   IntakeLog copyWith({
     int? id,
-    int? medicationId,
-    int? scheduleId,
+    Value<int?> medicationId = const Value.absent(),
+    Value<int?> scheduleId = const Value.absent(),
+    Value<String?> medNameSnapshot = const Value.absent(),
     DateTime? scheduledAt,
     Value<DateTime?> actedAt = const Value.absent(),
     IntakeStatus? status,
@@ -2789,8 +2605,11 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
     DateTime? updatedAt,
   }) => IntakeLog(
     id: id ?? this.id,
-    medicationId: medicationId ?? this.medicationId,
-    scheduleId: scheduleId ?? this.scheduleId,
+    medicationId: medicationId.present ? medicationId.value : this.medicationId,
+    scheduleId: scheduleId.present ? scheduleId.value : this.scheduleId,
+    medNameSnapshot: medNameSnapshot.present
+        ? medNameSnapshot.value
+        : this.medNameSnapshot,
     scheduledAt: scheduledAt ?? this.scheduledAt,
     actedAt: actedAt.present ? actedAt.value : this.actedAt,
     status: status ?? this.status,
@@ -2808,6 +2627,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
       scheduleId: data.scheduleId.present
           ? data.scheduleId.value
           : this.scheduleId,
+      medNameSnapshot: data.medNameSnapshot.present
+          ? data.medNameSnapshot.value
+          : this.medNameSnapshot,
       scheduledAt: data.scheduledAt.present
           ? data.scheduledAt.value
           : this.scheduledAt,
@@ -2828,6 +2650,7 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
           ..write('id: $id, ')
           ..write('medicationId: $medicationId, ')
           ..write('scheduleId: $scheduleId, ')
+          ..write('medNameSnapshot: $medNameSnapshot, ')
           ..write('scheduledAt: $scheduledAt, ')
           ..write('actedAt: $actedAt, ')
           ..write('status: $status, ')
@@ -2844,6 +2667,7 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
     id,
     medicationId,
     scheduleId,
+    medNameSnapshot,
     scheduledAt,
     actedAt,
     status,
@@ -2859,6 +2683,7 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
           other.id == this.id &&
           other.medicationId == this.medicationId &&
           other.scheduleId == this.scheduleId &&
+          other.medNameSnapshot == this.medNameSnapshot &&
           other.scheduledAt == this.scheduledAt &&
           other.actedAt == this.actedAt &&
           other.status == this.status &&
@@ -2870,8 +2695,9 @@ class IntakeLog extends DataClass implements Insertable<IntakeLog> {
 
 class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
   final Value<int> id;
-  final Value<int> medicationId;
-  final Value<int> scheduleId;
+  final Value<int?> medicationId;
+  final Value<int?> scheduleId;
+  final Value<String?> medNameSnapshot;
   final Value<DateTime> scheduledAt;
   final Value<DateTime?> actedAt;
   final Value<IntakeStatus> status;
@@ -2883,6 +2709,7 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
     this.id = const Value.absent(),
     this.medicationId = const Value.absent(),
     this.scheduleId = const Value.absent(),
+    this.medNameSnapshot = const Value.absent(),
     this.scheduledAt = const Value.absent(),
     this.actedAt = const Value.absent(),
     this.status = const Value.absent(),
@@ -2893,8 +2720,9 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
   });
   IntakeLogsCompanion.insert({
     this.id = const Value.absent(),
-    required int medicationId,
-    required int scheduleId,
+    this.medicationId = const Value.absent(),
+    this.scheduleId = const Value.absent(),
+    this.medNameSnapshot = const Value.absent(),
     required DateTime scheduledAt,
     this.actedAt = const Value.absent(),
     this.status = const Value.absent(),
@@ -2902,13 +2730,12 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
     this.memo = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
-  }) : medicationId = Value(medicationId),
-       scheduleId = Value(scheduleId),
-       scheduledAt = Value(scheduledAt);
+  }) : scheduledAt = Value(scheduledAt);
   static Insertable<IntakeLog> custom({
     Expression<int>? id,
     Expression<int>? medicationId,
     Expression<int>? scheduleId,
+    Expression<String>? medNameSnapshot,
     Expression<DateTime>? scheduledAt,
     Expression<DateTime>? actedAt,
     Expression<int>? status,
@@ -2921,6 +2748,7 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
       if (id != null) 'id': id,
       if (medicationId != null) 'medication_id': medicationId,
       if (scheduleId != null) 'schedule_id': scheduleId,
+      if (medNameSnapshot != null) 'med_name_snapshot': medNameSnapshot,
       if (scheduledAt != null) 'scheduled_at': scheduledAt,
       if (actedAt != null) 'acted_at': actedAt,
       if (status != null) 'status': status,
@@ -2933,8 +2761,9 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
 
   IntakeLogsCompanion copyWith({
     Value<int>? id,
-    Value<int>? medicationId,
-    Value<int>? scheduleId,
+    Value<int?>? medicationId,
+    Value<int?>? scheduleId,
+    Value<String?>? medNameSnapshot,
     Value<DateTime>? scheduledAt,
     Value<DateTime?>? actedAt,
     Value<IntakeStatus>? status,
@@ -2947,6 +2776,7 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
       id: id ?? this.id,
       medicationId: medicationId ?? this.medicationId,
       scheduleId: scheduleId ?? this.scheduleId,
+      medNameSnapshot: medNameSnapshot ?? this.medNameSnapshot,
       scheduledAt: scheduledAt ?? this.scheduledAt,
       actedAt: actedAt ?? this.actedAt,
       status: status ?? this.status,
@@ -2968,6 +2798,9 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
     }
     if (scheduleId.present) {
       map['schedule_id'] = Variable<int>(scheduleId.value);
+    }
+    if (medNameSnapshot.present) {
+      map['med_name_snapshot'] = Variable<String>(medNameSnapshot.value);
     }
     if (scheduledAt.present) {
       map['scheduled_at'] = Variable<DateTime>(scheduledAt.value);
@@ -3001,6 +2834,7 @@ class IntakeLogsCompanion extends UpdateCompanion<IntakeLog> {
           ..write('id: $id, ')
           ..write('medicationId: $medicationId, ')
           ..write('scheduleId: $scheduleId, ')
+          ..write('medNameSnapshot: $medNameSnapshot, ')
           ..write('scheduledAt: $scheduledAt, ')
           ..write('actedAt: $actedAt, ')
           ..write('status: $status, ')
@@ -3418,14 +3252,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         'tracked_medications',
         limitUpdateKind: UpdateKind.delete,
       ),
-      result: [TableUpdate('intake_logs', kind: UpdateKind.delete)],
+      result: [TableUpdate('intake_logs', kind: UpdateKind.update)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'schedules',
         limitUpdateKind: UpdateKind.delete,
       ),
-      result: [TableUpdate('intake_logs', kind: UpdateKind.delete)],
+      result: [TableUpdate('intake_logs', kind: UpdateKind.update)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -3891,14 +3725,9 @@ typedef $$TrackedMedicationsTableCreateCompanionBuilder =
     TrackedMedicationsCompanion Function({
       Value<int> id,
       Value<String?> catalogItemId,
-      required String name,
-      Value<String?> category,
-      Value<String?> dosage,
-      Value<String?> unit,
-      Value<String?> shape,
-      Value<String?> colorHex,
+      Value<String?> customDosage,
+      Value<String?> customUnit,
       Value<String?> memo,
-      Value<String?> iconKey,
       Value<bool> archived,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -3907,14 +3736,9 @@ typedef $$TrackedMedicationsTableUpdateCompanionBuilder =
     TrackedMedicationsCompanion Function({
       Value<int> id,
       Value<String?> catalogItemId,
-      Value<String> name,
-      Value<String?> category,
-      Value<String?> dosage,
-      Value<String?> unit,
-      Value<String?> shape,
-      Value<String?> colorHex,
+      Value<String?> customDosage,
+      Value<String?> customUnit,
       Value<String?> memo,
-      Value<String?> iconKey,
       Value<bool> archived,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -4012,43 +3836,18 @@ class $$TrackedMedicationsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
+  ColumnFilters<String> get customDosage => $composableBuilder(
+    column: $table.customDosage,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get category => $composableBuilder(
-    column: $table.category,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get dosage => $composableBuilder(
-    column: $table.dosage,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get unit => $composableBuilder(
-    column: $table.unit,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get shape => $composableBuilder(
-    column: $table.shape,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get colorHex => $composableBuilder(
-    column: $table.colorHex,
+  ColumnFilters<String> get customUnit => $composableBuilder(
+    column: $table.customUnit,
     builder: (column) => ColumnFilters(column),
   );
 
   ColumnFilters<String> get memo => $composableBuilder(
     column: $table.memo,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get iconKey => $composableBuilder(
-    column: $table.iconKey,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4155,43 +3954,18 @@ class $$TrackedMedicationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
+  ColumnOrderings<String> get customDosage => $composableBuilder(
+    column: $table.customDosage,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get category => $composableBuilder(
-    column: $table.category,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get dosage => $composableBuilder(
-    column: $table.dosage,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get unit => $composableBuilder(
-    column: $table.unit,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get shape => $composableBuilder(
-    column: $table.shape,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get colorHex => $composableBuilder(
-    column: $table.colorHex,
+  ColumnOrderings<String> get customUnit => $composableBuilder(
+    column: $table.customUnit,
     builder: (column) => ColumnOrderings(column),
   );
 
   ColumnOrderings<String> get memo => $composableBuilder(
     column: $table.memo,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get iconKey => $composableBuilder(
-    column: $table.iconKey,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4246,29 +4020,18 @@ class $$TrackedMedicationsTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
+  GeneratedColumn<String> get customDosage => $composableBuilder(
+    column: $table.customDosage,
+    builder: (column) => column,
+  );
 
-  GeneratedColumn<String> get category =>
-      $composableBuilder(column: $table.category, builder: (column) => column);
-
-  GeneratedColumn<String> get dosage =>
-      $composableBuilder(column: $table.dosage, builder: (column) => column);
-
-  GeneratedColumn<String> get unit =>
-      $composableBuilder(column: $table.unit, builder: (column) => column);
-
-  GeneratedColumn<String> get shape =>
-      $composableBuilder(column: $table.shape, builder: (column) => column);
-
-  GeneratedColumn<String> get colorHex =>
-      $composableBuilder(column: $table.colorHex, builder: (column) => column);
+  GeneratedColumn<String> get customUnit => $composableBuilder(
+    column: $table.customUnit,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get memo =>
       $composableBuilder(column: $table.memo, builder: (column) => column);
-
-  GeneratedColumn<String> get iconKey =>
-      $composableBuilder(column: $table.iconKey, builder: (column) => column);
 
   GeneratedColumn<bool> get archived =>
       $composableBuilder(column: $table.archived, builder: (column) => column);
@@ -4392,28 +4155,18 @@ class $$TrackedMedicationsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String?> catalogItemId = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<String?> category = const Value.absent(),
-                Value<String?> dosage = const Value.absent(),
-                Value<String?> unit = const Value.absent(),
-                Value<String?> shape = const Value.absent(),
-                Value<String?> colorHex = const Value.absent(),
+                Value<String?> customDosage = const Value.absent(),
+                Value<String?> customUnit = const Value.absent(),
                 Value<String?> memo = const Value.absent(),
-                Value<String?> iconKey = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => TrackedMedicationsCompanion(
                 id: id,
                 catalogItemId: catalogItemId,
-                name: name,
-                category: category,
-                dosage: dosage,
-                unit: unit,
-                shape: shape,
-                colorHex: colorHex,
+                customDosage: customDosage,
+                customUnit: customUnit,
                 memo: memo,
-                iconKey: iconKey,
                 archived: archived,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -4422,28 +4175,18 @@ class $$TrackedMedicationsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String?> catalogItemId = const Value.absent(),
-                required String name,
-                Value<String?> category = const Value.absent(),
-                Value<String?> dosage = const Value.absent(),
-                Value<String?> unit = const Value.absent(),
-                Value<String?> shape = const Value.absent(),
-                Value<String?> colorHex = const Value.absent(),
+                Value<String?> customDosage = const Value.absent(),
+                Value<String?> customUnit = const Value.absent(),
                 Value<String?> memo = const Value.absent(),
-                Value<String?> iconKey = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => TrackedMedicationsCompanion.insert(
                 id: id,
                 catalogItemId: catalogItemId,
-                name: name,
-                category: category,
-                dosage: dosage,
-                unit: unit,
-                shape: shape,
-                colorHex: colorHex,
+                customDosage: customDosage,
+                customUnit: customUnit,
                 memo: memo,
-                iconKey: iconKey,
                 archived: archived,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -5282,8 +5025,9 @@ typedef $$SchedulesTableProcessedTableManager =
 typedef $$IntakeLogsTableCreateCompanionBuilder =
     IntakeLogsCompanion Function({
       Value<int> id,
-      required int medicationId,
-      required int scheduleId,
+      Value<int?> medicationId,
+      Value<int?> scheduleId,
+      Value<String?> medNameSnapshot,
       required DateTime scheduledAt,
       Value<DateTime?> actedAt,
       Value<IntakeStatus> status,
@@ -5295,8 +5039,9 @@ typedef $$IntakeLogsTableCreateCompanionBuilder =
 typedef $$IntakeLogsTableUpdateCompanionBuilder =
     IntakeLogsCompanion Function({
       Value<int> id,
-      Value<int> medicationId,
-      Value<int> scheduleId,
+      Value<int?> medicationId,
+      Value<int?> scheduleId,
+      Value<String?> medNameSnapshot,
       Value<DateTime> scheduledAt,
       Value<DateTime?> actedAt,
       Value<IntakeStatus> status,
@@ -5318,9 +5063,9 @@ final class $$IntakeLogsTableReferences
         ),
       );
 
-  $$TrackedMedicationsTableProcessedTableManager get medicationId {
-    final $_column = $_itemColumn<int>('medication_id')!;
-
+  $$TrackedMedicationsTableProcessedTableManager? get medicationId {
+    final $_column = $_itemColumn<int>('medication_id');
+    if ($_column == null) return null;
     final manager = $$TrackedMedicationsTableTableManager(
       $_db,
       $_db.trackedMedications,
@@ -5337,9 +5082,9 @@ final class $$IntakeLogsTableReferences
         $_aliasNameGenerator(db.intakeLogs.scheduleId, db.schedules.id),
       );
 
-  $$SchedulesTableProcessedTableManager get scheduleId {
-    final $_column = $_itemColumn<int>('schedule_id')!;
-
+  $$SchedulesTableProcessedTableManager? get scheduleId {
+    final $_column = $_itemColumn<int>('schedule_id');
+    if ($_column == null) return null;
     final manager = $$SchedulesTableTableManager(
       $_db,
       $_db.schedules,
@@ -5363,6 +5108,11 @@ class $$IntakeLogsTableFilterComposer
   });
   ColumnFilters<int> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get medNameSnapshot => $composableBuilder(
+    column: $table.medNameSnapshot,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5463,6 +5213,11 @@ class $$IntakeLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get medNameSnapshot => $composableBuilder(
+    column: $table.medNameSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get scheduledAt => $composableBuilder(
     column: $table.scheduledAt,
     builder: (column) => ColumnOrderings(column),
@@ -5556,6 +5311,11 @@ class $$IntakeLogsTableAnnotationComposer
   });
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get medNameSnapshot => $composableBuilder(
+    column: $table.medNameSnapshot,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get scheduledAt => $composableBuilder(
     column: $table.scheduledAt,
@@ -5659,8 +5419,9 @@ class $$IntakeLogsTableTableManager
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
-                Value<int> medicationId = const Value.absent(),
-                Value<int> scheduleId = const Value.absent(),
+                Value<int?> medicationId = const Value.absent(),
+                Value<int?> scheduleId = const Value.absent(),
+                Value<String?> medNameSnapshot = const Value.absent(),
                 Value<DateTime> scheduledAt = const Value.absent(),
                 Value<DateTime?> actedAt = const Value.absent(),
                 Value<IntakeStatus> status = const Value.absent(),
@@ -5672,6 +5433,7 @@ class $$IntakeLogsTableTableManager
                 id: id,
                 medicationId: medicationId,
                 scheduleId: scheduleId,
+                medNameSnapshot: medNameSnapshot,
                 scheduledAt: scheduledAt,
                 actedAt: actedAt,
                 status: status,
@@ -5683,8 +5445,9 @@ class $$IntakeLogsTableTableManager
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
-                required int medicationId,
-                required int scheduleId,
+                Value<int?> medicationId = const Value.absent(),
+                Value<int?> scheduleId = const Value.absent(),
+                Value<String?> medNameSnapshot = const Value.absent(),
                 required DateTime scheduledAt,
                 Value<DateTime?> actedAt = const Value.absent(),
                 Value<IntakeStatus> status = const Value.absent(),
@@ -5696,6 +5459,7 @@ class $$IntakeLogsTableTableManager
                 id: id,
                 medicationId: medicationId,
                 scheduleId: scheduleId,
+                medNameSnapshot: medNameSnapshot,
                 scheduledAt: scheduledAt,
                 actedAt: actedAt,
                 status: status,

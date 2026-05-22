@@ -6,26 +6,59 @@ import '../app_buttons.dart';
 import '../med_pill_svg.dart';
 
 /// 번들 알림 한 행의 데이터.
+///
+/// mark API 호출에 필요한 식별자([scheduleId]/[medicationId]/[scheduledAt])를
+/// 동봉. UI는 [name]/[quantity]만 표시.
 class BundleMed {
-  const BundleMed({required this.name, required this.quantity});
+  const BundleMed({
+    required this.name,
+    required this.quantity,
+    required this.scheduleId,
+    required this.medicationId,
+    required this.scheduledAt,
+    this.alreadyTaken = false,
+  });
   final String name;
   final String quantity;
+  final int scheduleId;
+  final int medicationId;
+  final DateTime scheduledAt;
+
+  /// 이미 taken 상태면 시트 체크 박스 초기값을 켜고 mark 호출 skip.
+  final bool alreadyTaken;
 }
 
 /// `rNB` — 같은 시각 묶음 알림 (상단 anchored 카드).
 ///
 /// 시안의 .nt는 상단에서 내려오는 알림 카드. Flutter는 showGeneralDialog +
 /// 슬라이드 다운 transition으로 표현.
+///
+/// 두 액션:
+/// - "전부 먹었어요" → [onMarkTaken]을 시트가 가진 [meds] 전체와 함께 호출
+/// - "1시간 뒤에" → [onSnoozeAll] 호출 (선택). 둘 다 후 시트 자동 닫힘.
 class BundleNotificationSheet extends StatefulWidget {
-  const BundleNotificationSheet._({required this.time, required this.meds});
+  const BundleNotificationSheet._({
+    required this.time,
+    required this.meds,
+    required this.onMarkTaken,
+    required this.onSnoozeAll,
+  });
 
   final String time;
   final List<BundleMed> meds;
+
+  /// 마크 콜백 — DB write는 caller 책임. 시트는 UI만 담당.
+  final Future<void> Function(List<BundleMed>) onMarkTaken;
+
+  /// 스누즈 콜백 (옵션). null이면 "1시간 뒤에" 버튼은 단순 close.
+  final Future<void> Function(List<BundleMed>)? onSnoozeAll;
 
   static Future<void> show(
     BuildContext context, {
     required String time,
     required List<BundleMed> meds,
+    required Future<void> Function(List<BundleMed>) onMarkTaken,
+    Future<void> Function(List<BundleMed>)? onSnoozeAll,
   }) {
     return showGeneralDialog<void>(
       context: context,
@@ -36,6 +69,8 @@ class BundleNotificationSheet extends StatefulWidget {
       pageBuilder: (_, _, _) => BundleNotificationSheet._(
         time: time,
         meds: meds,
+        onMarkTaken: onMarkTaken,
+        onSnoozeAll: onSnoozeAll,
       ),
       transitionBuilder: (_, anim, _, child) {
         final offset = Tween<Offset>(
@@ -56,8 +91,72 @@ class BundleNotificationSheet extends StatefulWidget {
 }
 
 class _BundleNotificationSheetState extends State<BundleNotificationSheet> {
-  late final List<bool> _checked =
-      List.filled(widget.meds.length, false, growable: false);
+  late final List<bool> _checked = [
+    for (final m in widget.meds) m.alreadyTaken,
+  ];
+  bool _busy = false;
+
+  /// 사용자가 새로 체크한(=alreadyTaken 아닌데 _checked인) 항목 수.
+  int _newlyCheckedCount() {
+    var n = 0;
+    for (var i = 0; i < widget.meds.length; i++) {
+      if (!widget.meds[i].alreadyTaken && _checked[i]) n++;
+    }
+    return n;
+  }
+
+  /// 아직 taken 아닌 항목 수.
+  int _untakenCount() {
+    var n = 0;
+    for (final m in widget.meds) {
+      if (!m.alreadyTaken) n++;
+    }
+    return n;
+  }
+
+  String _confirmLabel() {
+    final checked = _newlyCheckedCount();
+    final untaken = _untakenCount();
+    if (untaken == 0) return '확인';
+    if (checked == 0 || checked == untaken) return '전부 먹었어요';
+    return '선택한 $checked개 먹었어요';
+  }
+
+  Future<void> _confirmTaken() async {
+    if (_busy) return;
+    // 체크된 항목이 있으면 그것만, 없으면 전체 (alreadyTaken 제외).
+    final hasChecked = _newlyCheckedCount() > 0;
+    final selected = <BundleMed>[
+      for (var i = 0; i < widget.meds.length; i++)
+        if (!widget.meds[i].alreadyTaken && (!hasChecked || _checked[i]))
+          widget.meds[i],
+    ];
+    if (selected.isEmpty) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await widget.onMarkTaken(selected);
+    } finally {
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _snooze() async {
+    if (_busy) return;
+    final cb = widget.onSnoozeAll;
+    if (cb == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await cb(widget.meds);
+    } finally {
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
 
   static const _appIconSvg = '''
 <svg viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg">
@@ -97,9 +196,10 @@ class _BundleNotificationSheetState extends State<BundleNotificationSheet> {
                     children: [
                       Expanded(
                         child: AppButton(
-                          label: '전부 먹었어요',
+                          label: _confirmLabel(),
                           fullWidth: true,
-                          onPressed: () => Navigator.of(context).pop(),
+                          loading: _busy,
+                          onPressed: _busy ? null : _confirmTaken,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -108,7 +208,7 @@ class _BundleNotificationSheetState extends State<BundleNotificationSheet> {
                           label: '1시간 뒤에',
                           variant: AppButtonVariant.primaryTint,
                           fullWidth: true,
-                          onPressed: () => Navigator.of(context).pop(),
+                          onPressed: _busy ? null : _snooze,
                         ),
                       ),
                     ],

@@ -33,12 +33,16 @@ final todayDosesProvider = Provider<AsyncValue<List<DoseInstance>>>((ref) {
         error: (e, st) => AsyncValue.error(e, st),
         data: (logs) {
           final meds = medsWithSchedules.map((m) => m.medication).toList();
+          final catalogByMedId = {
+            for (final m in medsWithSchedules) m.medication.id: m.catalog,
+          };
           final scheds = [
             for (final m in medsWithSchedules) ...m.schedules,
           ];
           return AsyncValue.data(computeDosesForDay(
             date: DateTime.now(),
             meds: meds,
+            catalogByMedId: catalogByMedId,
             schedules: scheds,
             logs: logs,
           ));

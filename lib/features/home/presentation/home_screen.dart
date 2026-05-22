@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -166,7 +169,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     final bundle = doses
         .where((d) => d.scheduledAt == targetTime)
-        .map((d) => BundleMed(name: d.medicationName, quantity: d.quantityLabel))
+        .map((d) => BundleMed(
+              name: d.medicationName,
+              quantity: d.quantityLabel,
+              scheduleId: d.scheduleId,
+              medicationId: d.medicationId,
+              scheduledAt: d.scheduledAt,
+              alreadyTaken: d.status == IntakeStatus.taken,
+            ))
         .toList();
 
     await BundleNotificationSheet.show(
@@ -175,6 +185,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ? ''
           : '${targetTime.hour.toString().padLeft(2, '0')}:${targetTime.minute.toString().padLeft(2, '0')}',
       meds: bundle,
+      onMarkTaken: (selected) async {
+        final repo = ref.read(intakeRepositoryProvider);
+        for (final m in selected) {
+          await repo.markTaken(
+            medicationId: m.medicationId,
+            scheduleId: m.scheduleId,
+            scheduledAt: m.scheduledAt,
+          );
+        }
+      },
     );
   }
 
@@ -222,99 +242,201 @@ class _SummaryCard extends ConsumerWidget {
         const TodayCounts(done: 0, pending: 0, missed: 0, total: 0);
     final next = nextDoseAsync.value;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
-      decoration: BoxDecoration(
-        color: AppColors.primaryTint,
-        borderRadius: BorderRadius.circular(22),
+    // 카드 진입 시 한 번 fade + slide-up. 부모 rebuild에도 TweenAnimationBuilder
+    // 의 widget state가 유지돼 추가 트윈은 발생하지 않음.
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(
+          offset: Offset(0, (1 - t) * 12),
+          child: child,
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '오늘 복용 현황',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    RichText(
-                      text: TextSpan(
-                        style: const TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textStrong,
-                          height: 1.4,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+        decoration: BoxDecoration(
+          color: AppColors.primaryTint,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '오늘 복용 현황',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
                         ),
-                        children: [
-                          TextSpan(text: '오늘 ${counts.total}개 중\n'),
-                          TextSpan(
-                            text: '${counts.done}개 완료',
-                            style: const TextStyle(color: AppColors.primary),
-                          ),
-                          const TextSpan(text: '했어요!'),
-                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      _AnimatedTodayHeadline(
+                        total: counts.total,
+                        done: counts.done,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                DonutProgress(progress: counts.progress),
+              ],
+            ),
+            const SizedBox(height: 18),
+            StatGrid4(
+              cells: [
+                StatCell(
+                  icon: Icons.check_rounded,
+                  iconColor: AppColors.primary,
+                  label: '완료',
+                  count: counts.done,
+                  filled: true,
+                  onTap: () =>
+                      _goToCalendar(context, ref, DayFilter.completed),
+                ),
+                StatCell(
+                  icon: Icons.access_time_rounded,
+                  iconColor: AppColors.primary,
+                  label: '예정',
+                  count: counts.pending,
+                  onTap: () =>
+                      _goToCalendar(context, ref, DayFilter.scheduled),
+                ),
+                StatCell(
+                  icon: Icons.error_outline_rounded,
+                  iconColor: AppColors.missed,
+                  label: '놓침',
+                  count: counts.missed,
+                  onTap: () => _goToCalendar(context, ref, DayFilter.missed),
+                ),
+                StatCell(
+                  icon: Icons.format_list_bulleted_rounded,
+                  iconColor: AppColors.textMuted,
+                  label: '전체',
+                  count: counts.total,
+                  onTap: () => _goToCalendar(context, ref, DayFilter.all),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            // next가 있을 때만 pill 표시 — 등장/사라짐을 부드럽게.
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SizeTransition(
+                  sizeFactor: anim,
+                  axisAlignment: -1,
+                  child: child,
                 ),
               ),
-              const SizedBox(width: 10),
-              DonutProgress(progress: counts.progress),
-            ],
+              child: next != null
+                  ? _NextDosePill(
+                      key: ValueKey(
+                        'next-${next.scheduleId}-${next.scheduledAt.millisecondsSinceEpoch}',
+                      ),
+                      dose: next,
+                    )
+                  : const SizedBox(
+                      key: ValueKey('next-empty'),
+                      width: double.infinity,
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "오늘 N개 중 M개 완료했어요!" 헤드라인 — total/done 숫자가 변경되면 implicit
+/// IntTween으로 트윈. RichText 안에 숫자만 트윈하기 위해 WidgetSpan으로 inline.
+class _AnimatedTodayHeadline extends StatelessWidget {
+  const _AnimatedTodayHeadline({required this.total, required this.done});
+
+  final int total;
+  final int done;
+
+  @override
+  Widget build(BuildContext context) {
+    const baseStyle = TextStyle(
+      fontSize: 21,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textStrong,
+      height: 1.4,
+    );
+    const accentStyle = TextStyle(
+      fontSize: 21,
+      fontWeight: FontWeight.w700,
+      color: AppColors.primary,
+      height: 1.4,
+      fontFeatures: [FontFeature.tabularFigures()],
+    );
+    const numStyle = TextStyle(
+      fontSize: 21,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textStrong,
+      height: 1.4,
+      fontFeatures: [FontFeature.tabularFigures()],
+    );
+
+    return RichText(
+      text: TextSpan(
+        style: baseStyle,
+        children: [
+          const TextSpan(text: '오늘 '),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: _TweenedInt(value: total, style: numStyle),
           ),
-          const SizedBox(height: 18),
-          StatGrid4(
-            cells: [
-              StatCell(
-                icon: Icons.check_rounded,
-                iconColor: AppColors.primary,
-                label: '완료',
-                count: counts.done,
-                filled: true,
-                onTap: () => _goToCalendar(context, ref, DayFilter.completed),
-              ),
-              StatCell(
-                icon: Icons.access_time_rounded,
-                iconColor: AppColors.primary,
-                label: '예정',
-                count: counts.pending,
-                onTap: () => _goToCalendar(context, ref, DayFilter.scheduled),
-              ),
-              StatCell(
-                icon: Icons.error_outline_rounded,
-                iconColor: AppColors.missed,
-                label: '놓침',
-                count: counts.missed,
-                onTap: () => _goToCalendar(context, ref, DayFilter.missed),
-              ),
-              StatCell(
-                icon: Icons.format_list_bulleted_rounded,
-                iconColor: AppColors.textMuted,
-                label: '전체',
-                count: counts.total,
-                onTap: () => _goToCalendar(context, ref, DayFilter.all),
-              ),
-            ],
+          const TextSpan(text: '개 중\n'),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: _TweenedInt(value: done, style: accentStyle),
           ),
-          const SizedBox(height: 14),
-          if (next != null) _NextDosePill(dose: next),
+          const TextSpan(
+            text: '개 완료',
+            style: TextStyle(color: AppColors.primary),
+          ),
+          const TextSpan(text: '했어요!'),
         ],
       ),
     );
   }
 }
 
+/// IntTween 기반 트윈된 숫자 텍스트.
+class _TweenedInt extends StatelessWidget {
+  const _TweenedInt({required this.value, required this.style});
+
+  final int value;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<int>(
+      tween: IntTween(begin: 0, end: value),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutCubic,
+      builder: (context, v, _) => Text('$v', style: style),
+    );
+  }
+}
+
 class _NextDosePill extends StatelessWidget {
-  const _NextDosePill({required this.dose});
+  const _NextDosePill({super.key, required this.dose});
   final DoseInstance dose;
 
   @override
@@ -574,7 +696,7 @@ class _MedCard extends StatelessWidget {
   }
 }
 
-class _DoseRow extends StatelessWidget {
+class _DoseRow extends StatefulWidget {
   const _DoseRow({
     required this.dose,
     required this.showTakeButton,
@@ -586,50 +708,121 @@ class _DoseRow extends StatelessWidget {
   final VoidCallback onTaken;
 
   @override
+  State<_DoseRow> createState() => _DoseRowState();
+}
+
+class _DoseRowState extends State<_DoseRow> {
+  /// 복용 완료 직후 행 배경에 잠깐 success-tint를 깔아 시각 피드백.
+  /// Stream 갱신으로 status가 taken으로 바뀌어 버튼→배지로 전환되는 동안에도
+  /// 사용자에게 “기록됐다”는 신호.
+  bool _flashing = false;
+  Timer? _flashTimer;
+
+  @override
+  void dispose() {
+    _flashTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handleTaken() {
+    // 1) 즉시 햅틱 — 액션 확정 피드백.
+    HapticFeedback.lightImpact();
+    // 2) 행 success flash 트리거 — Stack 오버레이로 layout 영향 없음.
+    setState(() => _flashing = true);
+    _flashTimer?.cancel();
+    _flashTimer = Timer(const Duration(milliseconds: 650), () {
+      if (!mounted) return;
+      setState(() => _flashing = false);
+    });
+    // 3) 실제 markTaken — Stream이 갱신되면 부모가 rebuild하면서 widget.showTakeButton
+    //    이 false로 바뀌고 AnimatedSwitcher가 부드럽게 배지로 전환.
+    widget.onTaken();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Row(
+    final dose = widget.dose;
+    return Stack(
+      fit: StackFit.passthrough,
       children: [
-        PillIcon.svg(medName: dose.medicationName),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      dose.medicationName,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textStrong,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  CategoryChip.fromCode(dose.category ?? 'sup'),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                dose.quantityLabel,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
+        // Flash overlay — layout에 영향 주지 않게 Stack/Positioned.fill.
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: _flashing ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOut,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.successTint,
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-            ],
+            ),
           ),
         ),
-        const SizedBox(width: 8),
-        showTakeButton
-            ? AppButton(
-                label: '먹었어요',
-                onPressed: onTaken,
-                size: AppButtonSize.sm,
-              )
-            : StatusBadge(status: _toBadgeStatus(dose.status)),
+        Row(
+          children: [
+            PillIcon.svg(medName: dose.medicationName),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          dose.medicationName,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textStrong,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      CategoryChip.fromCode(dose.category ?? 'sup'),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    dose.quantityLabel,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // 버튼 ↔ 배지 전환을 부드럽게. key로 child identity 명시.
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.85, end: 1.0).animate(anim),
+                  child: child,
+                ),
+              ),
+              child: widget.showTakeButton
+                  ? AppButton(
+                      key: const ValueKey('take-btn'),
+                      label: '먹었어요',
+                      onPressed: _handleTaken,
+                      size: AppButtonSize.sm,
+                    )
+                  : StatusBadge(
+                      key: ValueKey('badge-${dose.status.name}'),
+                      status: _toBadgeStatus(dose.status),
+                    ),
+            ),
+          ],
+        ),
       ],
     );
   }

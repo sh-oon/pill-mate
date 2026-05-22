@@ -10,7 +10,7 @@ import 'notification_channels.dart';
 
 /// 알림 인프라 초기화 + 채널 등록 + 권한 요청.
 ///
-/// 실제 스케줄링은 [AlarmScheduler]가 담당.
+/// 실제 스케줄링은 `AlarmScheduler`가 담당.
 class NotificationService {
   NotificationService(this._plugin);
 

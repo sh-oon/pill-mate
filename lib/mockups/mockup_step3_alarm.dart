@@ -106,35 +106,40 @@ class _MockupStep3AlarmState extends State<MockupStep3Alarm> {
               ],
             ),
           ),
-          // 하단 액션 — "건너뛰기"가 동등 비중으로 노출됨.
+          // 하단 액션 — 가로 2개 (건너뛰기 / 완료).
+          // 화면 상단 "나중에 설정하고 싶으면 건너뛰어도 돼요" 카피로 의미 보강.
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
+            child: Row(
               children: [
-                AppButton(
-                  label: '완료 · 알람 설정하고 등록',
-                  variant: AppButtonVariant.primary,
-                  size: AppButtonSize.lg,
-                  fullWidth: true,
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('등록 완료 + 알람 ${1}개 설정')),
-                    );
-                  },
+                Expanded(
+                  child: AppButton(
+                    label: '건너뛰기',
+                    variant: AppButtonVariant.outline,
+                    size: AppButtonSize.lg,
+                    fullWidth: true,
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('등록 완료 (알람 없음) → drawer에서 확인'),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                const SizedBox(height: 10),
-                AppButton(
-                  label: '알람 없이 등록만 할게요 (나중에 추가)',
-                  variant: AppButtonVariant.outline,
-                  size: AppButtonSize.lg,
-                  fullWidth: true,
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('등록 완료 (알람 없음) → drawer에서 확인'),
-                      ),
-                    );
-                  },
+                const SizedBox(width: 10),
+                Expanded(
+                  child: AppButton(
+                    label: '완료',
+                    variant: AppButtonVariant.primary,
+                    size: AppButtonSize.lg,
+                    fullWidth: true,
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('등록 완료 + 알람 1개 설정')),
+                      );
+                    },
+                  ),
                 ),
               ],
             ),

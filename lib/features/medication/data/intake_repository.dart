@@ -48,12 +48,22 @@ class IntakeRepository {
         .watch();
   }
 
-  /// 범위 내 IntakeLog 일괄 조회 (월간 캘린더/리포트용).
+  /// 범위 내 IntakeLog 일괄 조회 (리포트용 1회성).
   Future<List<IntakeLog>> getRange(DateTime startInclusive, DateTime endExclusive) {
     return (_db.select(_db.intakeLogs)
           ..where((l) =>
               l.scheduledAt.isBetweenValues(startInclusive, endExclusive)))
         .get();
+  }
+
+  /// 범위 내 IntakeLog 스트림 (캘린더용 — markTaken/markSkipped 후 자동 갱신).
+  /// FutureProvider + getRange를 쓰면 홈에서 상태 변경 시 캘린더가 stale 표시.
+  Stream<List<IntakeLog>> watchRange(
+      DateTime startInclusive, DateTime endExclusive) {
+    return (_db.select(_db.intakeLogs)
+          ..where((l) =>
+              l.scheduledAt.isBetweenValues(startInclusive, endExclusive)))
+        .watch();
   }
 
   /// 특정 (medicationId, scheduleId, scheduledAt) 슬롯에 상태 기록.
@@ -74,8 +84,8 @@ class IntakeRepository {
     if (existing == null) {
       await _db.into(_db.intakeLogs).insert(
             IntakeLogsCompanion.insert(
-              medicationId: medicationId,
-              scheduleId: scheduleId,
+              medicationId: Value(medicationId),
+              scheduleId: Value(scheduleId),
               scheduledAt: scheduledAt,
               status: Value(status),
               actedAt: Value(now),
@@ -95,6 +105,24 @@ class IntakeRepository {
     await _notif.cancelUrgentForSchedule(scheduleId);
     // 2) interval 약: 액션 후 큐 +1 보강 위해 sync 재호출 (daily/weekly는 멱등).
     await _notif.syncSchedulesFor(medicationId);
+  }
+
+  /// 주어진 [scheduleIds] 중 [day] 하루(자정~익일 자정) 범위의 IntakeLog 조회.
+  ///
+  /// past-dose-edit backfill 후보에서 "이미 logged된 슬롯" 가드용.
+  /// scheduleIds 빈 입력은 short-circuit.
+  Future<List<IntakeLog>> logsAt({
+    required List<int> scheduleIds,
+    required DateTime day,
+  }) {
+    if (scheduleIds.isEmpty) return Future.value(const []);
+    final start = DateTime(day.year, day.month, day.day);
+    final end = start.add(const Duration(days: 1));
+    return (_db.select(_db.intakeLogs)
+          ..where((l) =>
+              l.scheduleId.isIn(scheduleIds) &
+              l.scheduledAt.isBetweenValues(start, end)))
+        .get();
   }
 
   Future<void> markTaken({
@@ -163,9 +191,14 @@ DateTime combineDateAndTime(DateTime date, String hhmm) {
 
 /// [date]일에 대해 schedule × time이 만들어내는 모든 dose 슬롯을 계산.
 /// 로그 list와 매칭해서 상태/logId 채워 반환.
+///
+/// Phase 2C: tracked에서 카탈로그 메타(name/category/dosage/unit) 제거됨에 따라
+/// [catalogByMedId]를 통해 catalog 정보 전달 받음. catalog NULL인 legacy는 폴백
+/// 텍스트 사용.
 List<DoseInstance> computeDosesForDay({
   required DateTime date,
   required List<TrackedMedication> meds,
+  required Map<int, CatalogItem?> catalogByMedId,
   required List<Schedule> schedules,
   required List<IntakeLog> logs,
   DateTime? now,
@@ -174,8 +207,13 @@ List<DoseInstance> computeDosesForDay({
   final nowTime = now ?? DateTime.now();
   final isToday = _dateOnly(date) == _dateOnly(nowTime);
 
+  String nameOf(TrackedMedication m) =>
+      catalogByMedId[m.id]?.name ?? '(이름 없음)';
+  String? categoryOf(TrackedMedication m) => catalogByMedId[m.id]?.category;
   String quantityOf(TrackedMedication m) {
-    final d = m.dosage, u = m.unit;
+    final c = catalogByMedId[m.id];
+    final d = m.customDosage ?? c?.defaultDosage;
+    final u = m.customUnit ?? c?.defaultUnit;
     if (d != null && u != null) return '$d$u';
     if (d != null) return d;
     return '1정';
@@ -194,10 +232,16 @@ List<DoseInstance> computeDosesForDay({
     );
     final hasLog = identical(log, _emptyLog) == false;
 
+    // 등록 시각 이전 슬롯(예: 14시 등록 + 08:00 시각)은 사용자가 실시간으로
+    // 챙길 수 없었던 슬롯이라 자동 "놓침" 처리 X — pending으로 유지해 홈/캘린더
+    // 리스트엔 보이되 리포트 놓침 카운트는 부풀리지 않음.
+    final beforeStart = scheduledAt.isBefore(s.startDate);
     final IntakeStatus status;
     if (hasLog) {
       status = log.status;
-    } else if (isToday && nowTime.isAfter(scheduledAt.add(const Duration(minutes: 5)))) {
+    } else if (isToday &&
+        !beforeStart &&
+        nowTime.isAfter(scheduledAt.add(const Duration(minutes: 5)))) {
       status = IntakeStatus.missed;
     } else {
       status = IntakeStatus.pending;
@@ -205,8 +249,8 @@ List<DoseInstance> computeDosesForDay({
 
     out.add(DoseInstance(
       medicationId: m.id,
-      medicationName: m.name,
-      category: m.category,
+      medicationName: nameOf(m),
+      category: categoryOf(m),
       quantityLabel: quantityOf(m),
       scheduleId: s.id,
       timeOfDay: s.timeOfDay,

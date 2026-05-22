@@ -43,6 +43,18 @@ class MedicationNotificationManager {
     await cancelForMedication(medicationId);
     if (med.archived) return;
 
+    // Phase 2C: 이름/용량 메타는 catalog가 SSOT. 알림 본문에 쓸 표시값을
+    // 한 번만 fetch해서 _scheduleRecurring에 string으로 전달.
+    final catalog = med.catalogItemId == null
+        ? null
+        : await (_db.select(_db.catalogItems)
+              ..where((c) => c.id.equals(med.catalogItemId!)))
+            .getSingleOrNull();
+    final medName = catalog?.name ?? '(이름 없음)';
+    final dosage = med.customDosage ?? catalog?.defaultDosage;
+    final unit = med.customUnit ?? catalog?.defaultUnit;
+    final quantityHint = _formatQuantityHint(dosage, unit);
+
     final scheds = await (_db.select(_db.schedules)
           ..where((s) =>
               s.medicationId.equals(medicationId) & s.enabled.equals(true)))
@@ -50,7 +62,12 @@ class MedicationNotificationManager {
 
     for (final s in scheds) {
       try {
-        await _scheduleRecurring(med: med, schedule: s);
+        await _scheduleRecurring(
+          med: med,
+          medName: medName,
+          quantityHint: quantityHint,
+          schedule: s,
+        );
       } catch (e, st) {
         debugPrint('schedule fail med=${med.id} sched=${s.id}: $e\n$st');
       }
@@ -82,22 +99,29 @@ class MedicationNotificationManager {
 
   Future<void> _scheduleRecurring({
     required TrackedMedication med,
+    required String medName,
+    required String quantityHint,
     required Schedule schedule,
   }) async {
     switch (schedule.repeatKind) {
       case RepeatKind.daily:
-        await _scheduleDaily(med, schedule);
+        await _scheduleDaily(med, medName, quantityHint, schedule);
         break;
       case RepeatKind.weekly:
-        await _scheduleWeekly(med, schedule);
+        await _scheduleWeekly(med, medName, quantityHint, schedule);
         break;
       case RepeatKind.interval:
-        await _scheduleInterval(med, schedule);
+        await _scheduleInterval(med, medName, quantityHint, schedule);
         break;
     }
   }
 
-  Future<void> _scheduleDaily(TrackedMedication med, Schedule s) async {
+  Future<void> _scheduleDaily(
+    TrackedMedication med,
+    String medName,
+    String quantityHint,
+    Schedule s,
+  ) async {
     final next = _nextOccurrence(s.timeOfDay);
 
     // 1) N분 전 사전 알림 (daily 반복).
@@ -107,7 +131,7 @@ class MedicationNotificationManager {
       final preNext = _nextOccurrence(preTime);
       await _plugin.zonedSchedule(
         _preReminderIdFor(s),
-        '${med.name} 복용 ${s.remindBeforeMinutes}분 전',
+        '$medName 복용 ${s.remindBeforeMinutes}분 전',
         '곧 복용 시간입니다.',
         preNext,
         _details(NotifTone.reminder),
@@ -122,8 +146,8 @@ class MedicationNotificationManager {
     // 2) onTime — 본 알림.
     await _plugin.zonedSchedule(
       _dailyIdFor(s),
-      '${med.name} 복용 시간',
-      _quantityHint(med),
+      '$medName 복용 시간',
+      quantityHint,
       next,
       _details(NotifTone.onTime),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -142,7 +166,7 @@ class MedicationNotificationManager {
         if (!at.isAfter(now)) continue;
         await _plugin.zonedSchedule(
           _urgentIdFor(s, n),
-          '⚠️ ${med.name} 미복용 알림',
+          '⚠️ $medName 미복용 알림',
           '아직 복용 체크가 되지 않았어요. 지금 확인해주세요.',
           at,
           _details(NotifTone.urgent),
@@ -158,7 +182,12 @@ class MedicationNotificationManager {
 
   static const int defaultUrgentMaxRepeats = 6;
 
-  Future<void> _scheduleWeekly(TrackedMedication med, Schedule s) async {
+  Future<void> _scheduleWeekly(
+    TrackedMedication med,
+    String medName,
+    String quantityHint,
+    Schedule s,
+  ) async {
     final mask = s.daysOfWeekMask ?? 0;
     // 비트 0=일요일 ... 비트 6=토요일.
     for (var bit = 0; bit < 7; bit++) {
@@ -167,8 +196,8 @@ class MedicationNotificationManager {
       final next = _nextWeeklyOccurrence(s.timeOfDay, weekday);
       await _plugin.zonedSchedule(
         _weeklyIdFor(s, weekday),
-        '${med.name} 복용 시간',
-        _quantityHint(med),
+        '$medName 복용 시간',
+        quantityHint,
         next,
         _details(NotifTone.onTime),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -185,6 +214,8 @@ class MedicationNotificationManager {
   /// 큐 길이 유지.
   Future<void> _scheduleInterval(
     TrackedMedication med,
+    String medName,
+    String quantityHint,
     Schedule s, {
     int target = 7,
   }) async {
@@ -241,8 +272,8 @@ class MedicationNotificationManager {
       if (!when.isAfter(now)) continue;
       await _plugin.zonedSchedule(
         _intervalIdForOccurrence(occ.id),
-        '${med.name} 복용 시간',
-        _quantityHint(med),
+        '$medName 복용 시간',
+        quantityHint,
         when,
         _details(NotifTone.onTime),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -301,6 +332,17 @@ class MedicationNotificationManager {
         .getSingleOrNull();
     if (med == null || med.archived) return;
 
+    // Phase 2C: catalog 메타 머지 — syncSchedulesFor와 동일 로직.
+    final catalog = med.catalogItemId == null
+        ? null
+        : await (_db.select(_db.catalogItems)
+              ..where((c) => c.id.equals(med.catalogItemId!)))
+            .getSingleOrNull();
+    final medName = catalog?.name ?? '(이름 없음)';
+    final dosage = med.customDosage ?? catalog?.defaultDosage;
+    final unit = med.customUnit ?? catalog?.defaultUnit;
+    final quantityHint = _formatQuantityHint(dosage, unit);
+
     final when = tz.TZDateTime.from(
       DateTime.now().add(delay),
       tz.local,
@@ -308,8 +350,8 @@ class MedicationNotificationManager {
 
     await _plugin.zonedSchedule(
       _snoozeIdForSched(scheduleId),
-      '${med.name} 복용 시간 (다시 알림)',
-      _quantityHint(med),
+      '$medName 복용 시간 (다시 알림)',
+      quantityHint,
       when,
       _details(NotifTone.onTime),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -427,10 +469,11 @@ class MedicationNotificationManager {
     return NotificationDetails(android: android, iOS: ios);
   }
 
-  String _quantityHint(TrackedMedication m) {
-    final d = m.dosage, u = m.unit;
-    if (d != null && u != null) return '$d$u — 복용 후 체크해주세요';
-    if (d != null) return '$d — 복용 후 체크해주세요';
+  /// Phase 2C: 호출 측이 catalog 머지 후 (dosage, unit)을 전달.
+  /// `syncSchedulesFor`에서 한 번만 fetch + 머지해 모든 schedule에 재사용.
+  static String _formatQuantityHint(String? dosage, String? unit) {
+    if (dosage != null && unit != null) return '$dosage$unit — 복용 후 체크해주세요';
+    if (dosage != null) return '$dosage — 복용 후 체크해주세요';
     return '복용 후 체크해주세요';
   }
 
