@@ -94,6 +94,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'new',
+                    // 신규 등록은 root navigator에 띄워 bottom nav 숨김 —
+                    // 등록 흐름 집중도 향상. detail/edit은 shell 안 유지.
+                    parentNavigatorKey: _rootKey,
                     builder: (context, state) => const MedicationAddFlow(),
                   ),
                   GoRoute(
