@@ -25,7 +25,7 @@ class IntakeLogs extends Table {
       integer().nullable().references(Schedules, #id, onDelete: KeyAction.setNull)();
 
   /// tracked 삭제 후에도 어떤 약의 기록이었는지 식별할 수 있도록 이름 스냅샷.
-  /// [TrackedMedicationRepository.delete] 호출 시점에 tracked.name을 복사.
+  /// `TrackedMedicationRepository.delete` 호출 시점에 tracked.name을 복사.
   /// tracked가 살아 있는 동안엔 null.
   TextColumn get medNameSnapshot => text().nullable()();
 

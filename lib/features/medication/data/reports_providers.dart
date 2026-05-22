@@ -82,7 +82,7 @@ PeriodRange priorPeriodRange(ReportPeriod period) {
 // Doses by range
 // =============================================================================
 
-/// [range] 안 일자별 dose 묶음을 한 번에 계산.
+/// `range` 안 일자별 dose 묶음을 한 번에 계산.
 ///
 /// monthly/yearly에선 31~365일 분량을 한 번에 처리. 한 약·스케줄 세트 기준
 /// computeDosesForDay()를 일자별로 호출 — log은 한 번만 가져옴.
@@ -94,7 +94,7 @@ final dosesByRangeProvider = FutureProvider.family
 
   return medsAsync.when(
     loading: () async => <DateTime, List<DoseInstance>>{},
-    error: (e, st) async => throw e,
+    error: (e, st) async => Error.throwWithStackTrace(e, st),
     data: (medsWithSchedules) async {
       final logs = await repo.getRange(range.start, range.end);
       final meds = medsWithSchedules.map((m) => m.medication).toList();
@@ -174,7 +174,7 @@ PeriodSummary _summarize(
   );
 }
 
-/// [period] 현재 범위의 요약.
+/// `period` 현재 범위의 요약.
 final periodSummaryProvider =
     Provider.family<AsyncValue<PeriodSummary>, ReportPeriod>((ref, period) {
   final range = currentPeriodRange(period);
@@ -183,7 +183,7 @@ final periodSummaryProvider =
       .whenData((byDay) => _summarize(range, byDay));
 });
 
-/// [period] 직전 범위의 요약 (delta 계산용).
+/// `period` 직전 범위의 요약 (delta 계산용).
 final _priorPeriodSummaryProvider =
     Provider.family<AsyncValue<PeriodSummary>, ReportPeriod>((ref, period) {
   final range = priorPeriodRange(period);
@@ -192,7 +192,7 @@ final _priorPeriodSummaryProvider =
       .whenData((byDay) => _summarize(range, byDay));
 });
 
-/// 현재 [period] 완료율 − 직전 [period] 완료율 (정수 %p). 비교 데이터 없으면 null.
+/// 현재 `period` 완료율 − 직전 `period` 완료율 (정수 %p). 비교 데이터 없으면 null.
 final periodDeltaPercentProvider =
     Provider.family<AsyncValue<int?>, ReportPeriod>((ref, period) {
   final cur = ref.watch(periodSummaryProvider(period));
@@ -205,7 +205,7 @@ final periodDeltaPercentProvider =
   });
 });
 
-/// [period] 총 완료 횟수.
+/// `period` 총 완료 횟수.
 final periodTotalCompletedProvider =
     Provider.family<AsyncValue<int>, ReportPeriod>((ref, period) {
   return ref.watch(periodSummaryProvider(period)).whenData((s) => s.done);
@@ -295,7 +295,7 @@ List<PeriodBucket> _computeBuckets(
   }
 }
 
-/// [period] 차트용 막대 리스트 (granularity는 period에 따라 변동).
+/// `period` 차트용 막대 리스트 (granularity는 period에 따라 변동).
 final periodBucketsProvider =
     Provider.family<AsyncValue<List<PeriodBucket>>, ReportPeriod>(
         (ref, period) {
