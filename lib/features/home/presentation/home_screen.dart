@@ -239,99 +239,201 @@ class _SummaryCard extends ConsumerWidget {
         const TodayCounts(done: 0, pending: 0, missed: 0, total: 0);
     final next = nextDoseAsync.value;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
-      decoration: BoxDecoration(
-        color: AppColors.primaryTint,
-        borderRadius: BorderRadius.circular(22),
+    // 카드 진입 시 한 번 fade + slide-up. 부모 rebuild에도 TweenAnimationBuilder
+    // 의 widget state가 유지돼 추가 트윈은 발생하지 않음.
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(
+          offset: Offset(0, (1 - t) * 12),
+          child: child,
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '오늘 복용 현황',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    RichText(
-                      text: TextSpan(
-                        style: const TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textStrong,
-                          height: 1.4,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+        decoration: BoxDecoration(
+          color: AppColors.primaryTint,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '오늘 복용 현황',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
                         ),
-                        children: [
-                          TextSpan(text: '오늘 ${counts.total}개 중\n'),
-                          TextSpan(
-                            text: '${counts.done}개 완료',
-                            style: const TextStyle(color: AppColors.primary),
-                          ),
-                          const TextSpan(text: '했어요!'),
-                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      _AnimatedTodayHeadline(
+                        total: counts.total,
+                        done: counts.done,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                DonutProgress(progress: counts.progress),
+              ],
+            ),
+            const SizedBox(height: 18),
+            StatGrid4(
+              cells: [
+                StatCell(
+                  icon: Icons.check_rounded,
+                  iconColor: AppColors.primary,
+                  label: '완료',
+                  count: counts.done,
+                  filled: true,
+                  onTap: () =>
+                      _goToCalendar(context, ref, DayFilter.completed),
+                ),
+                StatCell(
+                  icon: Icons.access_time_rounded,
+                  iconColor: AppColors.primary,
+                  label: '예정',
+                  count: counts.pending,
+                  onTap: () =>
+                      _goToCalendar(context, ref, DayFilter.scheduled),
+                ),
+                StatCell(
+                  icon: Icons.error_outline_rounded,
+                  iconColor: AppColors.missed,
+                  label: '놓침',
+                  count: counts.missed,
+                  onTap: () => _goToCalendar(context, ref, DayFilter.missed),
+                ),
+                StatCell(
+                  icon: Icons.format_list_bulleted_rounded,
+                  iconColor: AppColors.textMuted,
+                  label: '전체',
+                  count: counts.total,
+                  onTap: () => _goToCalendar(context, ref, DayFilter.all),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            // next가 있을 때만 pill 표시 — 등장/사라짐을 부드럽게.
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SizeTransition(
+                  sizeFactor: anim,
+                  axisAlignment: -1,
+                  child: child,
                 ),
               ),
-              const SizedBox(width: 10),
-              DonutProgress(progress: counts.progress),
-            ],
+              child: next != null
+                  ? _NextDosePill(
+                      key: ValueKey(
+                        'next-${next.scheduleId}-${next.scheduledAt.millisecondsSinceEpoch}',
+                      ),
+                      dose: next,
+                    )
+                  : const SizedBox(
+                      key: ValueKey('next-empty'),
+                      width: double.infinity,
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "오늘 N개 중 M개 완료했어요!" 헤드라인 — total/done 숫자가 변경되면 implicit
+/// IntTween으로 트윈. RichText 안에 숫자만 트윈하기 위해 WidgetSpan으로 inline.
+class _AnimatedTodayHeadline extends StatelessWidget {
+  const _AnimatedTodayHeadline({required this.total, required this.done});
+
+  final int total;
+  final int done;
+
+  @override
+  Widget build(BuildContext context) {
+    const baseStyle = TextStyle(
+      fontSize: 21,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textStrong,
+      height: 1.4,
+    );
+    const accentStyle = TextStyle(
+      fontSize: 21,
+      fontWeight: FontWeight.w700,
+      color: AppColors.primary,
+      height: 1.4,
+      fontFeatures: [FontFeature.tabularFigures()],
+    );
+    const numStyle = TextStyle(
+      fontSize: 21,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textStrong,
+      height: 1.4,
+      fontFeatures: [FontFeature.tabularFigures()],
+    );
+
+    return RichText(
+      text: TextSpan(
+        style: baseStyle,
+        children: [
+          const TextSpan(text: '오늘 '),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: _TweenedInt(value: total, style: numStyle),
           ),
-          const SizedBox(height: 18),
-          StatGrid4(
-            cells: [
-              StatCell(
-                icon: Icons.check_rounded,
-                iconColor: AppColors.primary,
-                label: '완료',
-                count: counts.done,
-                filled: true,
-                onTap: () => _goToCalendar(context, ref, DayFilter.completed),
-              ),
-              StatCell(
-                icon: Icons.access_time_rounded,
-                iconColor: AppColors.primary,
-                label: '예정',
-                count: counts.pending,
-                onTap: () => _goToCalendar(context, ref, DayFilter.scheduled),
-              ),
-              StatCell(
-                icon: Icons.error_outline_rounded,
-                iconColor: AppColors.missed,
-                label: '놓침',
-                count: counts.missed,
-                onTap: () => _goToCalendar(context, ref, DayFilter.missed),
-              ),
-              StatCell(
-                icon: Icons.format_list_bulleted_rounded,
-                iconColor: AppColors.textMuted,
-                label: '전체',
-                count: counts.total,
-                onTap: () => _goToCalendar(context, ref, DayFilter.all),
-              ),
-            ],
+          const TextSpan(text: '개 중\n'),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: _TweenedInt(value: done, style: accentStyle),
           ),
-          const SizedBox(height: 14),
-          if (next != null) _NextDosePill(dose: next),
+          const TextSpan(
+            text: '개 완료',
+            style: TextStyle(color: AppColors.primary),
+          ),
+          const TextSpan(text: '했어요!'),
         ],
       ),
     );
   }
 }
 
+/// IntTween 기반 트윈된 숫자 텍스트.
+class _TweenedInt extends StatelessWidget {
+  const _TweenedInt({required this.value, required this.style});
+
+  final int value;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<int>(
+      tween: IntTween(begin: 0, end: value),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutCubic,
+      builder: (context, v, _) => Text('$v', style: style),
+    );
+  }
+}
+
 class _NextDosePill extends StatelessWidget {
-  const _NextDosePill({required this.dose});
+  const _NextDosePill({super.key, required this.dose});
   final DoseInstance dose;
 
   @override

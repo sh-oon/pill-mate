@@ -64,12 +64,20 @@ class _Cell extends StatelessWidget {
             style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
           const SizedBox(height: 2),
-          Text(
-            '${cell.count}개',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textStrong,
+          // count 변경 시 implicit IntTween — 마크 액션 직후 숫자가 자연스럽게
+          // 올라가는 micro-interaction. 첫 빌드에선 0→실제값 진입 효과도 함께.
+          TweenAnimationBuilder<int>(
+            tween: IntTween(begin: 0, end: cell.count),
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, _) => Text(
+              '$value개',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textStrong,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],
